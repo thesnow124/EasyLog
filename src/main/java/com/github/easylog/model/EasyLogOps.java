@@ -35,4 +35,5 @@ public class EasyLogOps {
     private String details;
 
     private String condition;
+
 }

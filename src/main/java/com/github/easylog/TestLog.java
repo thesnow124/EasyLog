@@ -2,7 +2,7 @@ package com.github.easylog;
 
 import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.annotation.EasyLogs;
-import com.github.easylog.emnu.OperateType;
+import com.github.easylog.constants.OpsType;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,13 +17,14 @@ import org.springframework.stereotype.Service;
 public class TestLog {
 
     @EasyLogs({
-            @EasyLog(module = "用户管理", type = OperateType.UPDATE, success = "测试多个日志-1： {getBeforeRealNameByName{#name}}"),
-            @EasyLog(module = "用户管理", type = OperateType.SELECT, success = "测试多个日志-2： {getBeforeRealNameByName{#name}}")
+            @EasyLog(module = "用户管理", type = OpsType.UPDATE, success = "测试多个日志-1： ${} 这是后缀${}",successParamList = {"{getBeforeRealNameByName{#name}}"}),
+            @EasyLog(module = "用户管理", type = OpsType.SELECT, success = "测试多个日志-2： {getBeforeRealNameByName{#name}}")
     })
     public void manyLog(String name) {
+
     }
 
-    @EasyLog(module = "用户管理", type = OperateType.UPDATE, success = "更新了用户信息：{{#userDto.name}}")
+    @EasyLog(module = "用户管理", type = OpsType.UPDATE, success = "更新了用户信息：{{#userDto.name}}")
     public UserEntity  update(UserDto userDto) {
         UserEntity userEntity = new UserEntity();
         userEntity.setId(userDto.getId());

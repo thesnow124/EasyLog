@@ -1,5 +1,8 @@
 package com.github.easylog.function;
 
+/**
+ * @author Gaosl
+ */
 public interface ICustomFunction {
 
     /**
@@ -7,7 +10,13 @@ public interface ICustomFunction {
      *
      * @return 是否执行前的函数
      */
-    boolean executeBefore();
+    default boolean executeBefore(){return  false;};
+    /**
+     * 目标方法执行时，环绕执行自定义函数
+     *
+     * @return 是否执行前的函数
+     */
+    default boolean executeAround(){return  false;};
 
     /**
      * 自定义函数名

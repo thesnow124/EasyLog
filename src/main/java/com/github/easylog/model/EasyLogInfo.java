@@ -5,12 +5,39 @@ import com.github.easylog.compare.FieldInfo;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author Gaosl
  */
 @Data
 public class EasyLogInfo {
+
+	/**
+	 * ip
+	 */
+	private String ip;
+
+	/**
+	 * url
+	 */
+	private String url;
+
+	/**
+	 * HTTP请求方式
+	 */
+	private String httpMethod;
+
+	/**
+	 * 类.方法
+	 */
+	private String classMethod;
+
+	/**
+	 * 接口参数
+	 */
+	private Map<String, Object> paramMap;
+
 
 	/**
 	 * 平台
@@ -38,9 +65,14 @@ public class EasyLogInfo {
 	private String type;
 
 	/**
-	 * 成功操作内容
+	 * 操作内容
 	 */
 	private String content;
+
+	/**
+	 * 操作参数
+	 */
+	private String[] paramList;
 
 	/**
 	 * 操作时间 时间戳单位：ms
@@ -72,7 +104,8 @@ public class EasyLogInfo {
 	/**
 	 * 详细的字段变更
 	 */
-	private List<FieldInfo> compareFields;
+	private List<FieldInfo> fieldInfoList;
+
 
 
 }

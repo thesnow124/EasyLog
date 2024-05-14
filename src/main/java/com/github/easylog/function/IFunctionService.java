@@ -1,5 +1,8 @@
 package com.github.easylog.function;
 
+/**
+ * @author Gaosl
+ */
 public interface IFunctionService {
 
     /**
@@ -18,4 +21,13 @@ public interface IFunctionService {
      * @return
      */
     boolean executeBefore(String functionName);
+
+    /**
+     * 是否在拦截的方法执行时环绕执行
+     *
+     * @param functionName 函数名
+     * @return
+     */
+     boolean executeAround(String functionName);
+
 }

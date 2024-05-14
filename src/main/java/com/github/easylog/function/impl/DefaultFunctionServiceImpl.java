@@ -6,6 +6,9 @@ import com.github.easylog.function.ICustomFunction;
 import com.github.easylog.function.IFunctionService;
 
 
+/**
+ * @author Gaosl
+ */
 public class DefaultFunctionServiceImpl implements IFunctionService {
 
     private final CustomFunctionFactory customFunctionFactory;
@@ -27,5 +30,11 @@ public class DefaultFunctionServiceImpl implements IFunctionService {
     public boolean executeBefore(String functionName) {
         ICustomFunction function = customFunctionFactory.getFunction(functionName);
         return function != null && function.executeBefore();
+    }
+
+    @Override
+    public boolean executeAround(String functionName) {
+        ICustomFunction function = customFunctionFactory.getFunction(functionName);
+        return function != null && function.executeAround();
     }
 }

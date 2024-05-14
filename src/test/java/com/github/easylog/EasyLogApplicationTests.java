@@ -1,7 +1,7 @@
 package com.github.easylog;
 
 import com.github.easylog.annotation.EasyLog;
-import com.github.easylog.emnu.OperateType;
+import com.github.easylog.constants.OpsType;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
@@ -14,7 +14,7 @@ class EasyLogApplicationTests {
     @Resource
     private TestLog testLog;
 
-    @EasyLog(module = "用户管理", type = OperateType.UPDATE,  success = "查询结果： {{#_result}}")
+    @EasyLog(module = "用户管理", type = OpsType.UPDATE,  success = "查询结果： {{#_result}}")
     @Test
     public void internalMethod() {
         TestLog.UserDto userDto1 = new TestLog.UserDto();

@@ -1,20 +1,55 @@
 package com.github.easylog.compare;
 
-import java.util.List;
+import com.github.easylog.util.JsonUtils;
+import lombok.extern.slf4j.Slf4j;
+
+import java.lang.reflect.Field;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * 比较器
- * @author qfwang666@163.com
- * @date 2022/2/20 22:51
+ * @author Gaosl
+ * @project EasyLog
+ * @description 默认比较器实现
+ * @date 2024/5/10 09:46:34
  */
-public interface Equator {
+@Slf4j
+public class Equator {
 
-    /**
-     * 获取两个对象中对应属性值的不同
-     *
-     * @param oldObj 老的对象
-     * @param newObj 新的对象
-     * @return 不同值的属性集合
-     */
-    List<FieldInfo> getDiffField(Object oldObj, Object newObj);
+    public static List<FieldInfo> getDiffField(Object oldBean, Object newBean) {
+        if (Objects.isNull(oldBean) && Objects.isNull(newBean)) {
+            return new ArrayList<>();
+        }
+        HashMap<String, String> oldMap = getMap(oldBean);
+        HashMap<String, String> newMap = getMap(newBean);
+        return Arrays.asList(oldMap.keySet(), newMap.keySet()).stream().flatMap(Collection::stream).map(k -> {
+            FieldInfo fieldDiff = new FieldInfo();
+            fieldDiff.setFieldName(k);
+            fieldDiff.setNewFieldVal(newMap.get(k));
+            fieldDiff.setOldFieldVal(oldMap.get(k));
+            return fieldDiff;
+        }).collect(Collectors.toList());
+    }
+
+    private static HashMap<String, String> getMap(Object bean) {
+        if (Objects.isNull(bean)) {
+            return new HashMap<>();
+        }
+        Class<?> clazz = bean.getClass();
+        Field[] fieldList = clazz.getFields();
+        HashMap<String, String> map = (HashMap<String, String>) Arrays.stream(fieldList)
+                .peek(f -> f.setAccessible(true))
+                .collect(Collectors.toMap(Field::getName, f -> {
+                    try {
+                        return JsonUtils.toJSONString(f.get(bean));
+                    } catch (IllegalAccessException e) {
+                        log.error("", e);
+                    }
+                    return null;
+                }, (v1, v2) -> v1));
+        return map;
+
+    }
+
+
 }

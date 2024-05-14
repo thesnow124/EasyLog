@@ -3,6 +3,7 @@ package com.github.easylog.function;
 
 import com.github.easylog.constants.EasyLogConsts;
 import com.github.easylog.context.EasyLogCachedExpressionEvaluator;
+import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
@@ -21,7 +22,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * @author Gaosl
+ * @author WangQingFei(qfwang666 @ 163.com)
+ * @date 2022/3/1 9:46
  */
 @Slf4j
 public class EasyLogParser implements BeanFactoryAware {
@@ -40,6 +42,7 @@ public class EasyLogParser implements BeanFactoryAware {
     private final EasyLogCachedExpressionEvaluator cachedExpressionEvaluator = new EasyLogCachedExpressionEvaluator();
 
     public Map<String, String> processAfterExec(List<String> expressTemplate, Map<String, String> funcValBeforeExecMap, Method method, Object[] args, Class<?> targetClass, String errMsg, Object result) {
+        //如果接口执行完成，那根据执行结果选择应该执行那个
         HashMap<String, String> map = new HashMap<>();
         AnnotatedElementKey elementKey = new AnnotatedElementKey(method, targetClass);
         EvaluationContext evaluationContext = cachedExpressionEvaluator.createEvaluationContext(method, args, beanFactory, errMsg, result);
@@ -124,17 +127,23 @@ public class EasyLogParser implements BeanFactoryAware {
      * @param funcName                  函数名
      * @param paramName                 函数参数名称
      * @param param                     函数参数
-     * @return
+     * @return String
      */
     public String getFuncVal(Map<String, String> funcValBeforeExecutionMap, String funcName, String paramName, String param) {
         String val = null;
+        //todo 接入国际化
+        //todo 支持线程私有变量，即用户手动输入
+        //todo 加密日志
         if (!CollectionUtils.isEmpty(funcValBeforeExecutionMap)) {
             val = funcValBeforeExecutionMap.get(getFunctionMapKey(funcName, paramName));
+        }
+        if ( customFunctionService.executeAround(funcName)) {
+            String apply = customFunctionService.apply(funcName, param);
+            val = String.join(",", Lists.newArrayList(val, apply));
         }
         if (ObjectUtils.isEmpty(val)) {
             val = customFunctionService.apply(funcName, param);
         }
-
         return val;
     }
 

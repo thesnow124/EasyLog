@@ -9,6 +9,9 @@ import java.security.CodeSource;
 import java.util.jar.Attributes;
 import java.util.jar.JarFile;
 
+/**
+ * @author Gaosl
+ */
 public class EasyLogVersion {
 
     private EasyLogVersion() {
