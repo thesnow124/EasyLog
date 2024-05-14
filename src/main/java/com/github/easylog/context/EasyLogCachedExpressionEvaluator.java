@@ -11,12 +11,9 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+
 /**
- * 缓存表达式求值器
- *
- * 参考 {@link org.springframework.cache.interceptor.CacheOperationExpressionEvaluator}
- * @author WangQingFei(qfwang666 @ 163.com)
- * @date 2022/5/1 15:32
+ * @author Gaosl
  */
 public class EasyLogCachedExpressionEvaluator extends CachedExpressionEvaluator {
 

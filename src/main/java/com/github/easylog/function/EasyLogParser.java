@@ -21,10 +21,7 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * @author WangQingFei(qfwang666 @ 163.com)
- * @date 2022/3/1 9:46
- */
+
 @Slf4j
 public class EasyLogParser implements BeanFactoryAware {
 

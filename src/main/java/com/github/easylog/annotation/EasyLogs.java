@@ -3,8 +3,7 @@ package com.github.easylog.annotation;
 import java.lang.annotation.*;
 
 /**
- * @author qfwang666@163.com
- * @date 2022/9/5 15:08
+ * @author Gaosl
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)

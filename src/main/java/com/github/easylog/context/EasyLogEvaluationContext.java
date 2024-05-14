@@ -6,11 +6,9 @@ import org.springframework.core.ParameterNameDiscoverer;
 
 import java.lang.reflect.Method;
 
+
 /**
- * MethodBasedEvaluationContext 基于方法的上下文，主要作用：将方法参数放入到上下文中
- *
- * @author WangQingFei(qfwang666 @ 163.com)
- * @date 2022/2/26 14:46
+ * @author Gaosl
  */
 public class EasyLogEvaluationContext extends MethodBasedEvaluationContext {
 

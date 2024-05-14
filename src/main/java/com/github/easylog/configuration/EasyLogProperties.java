@@ -1,15 +1,17 @@
 package com.github.easylog.configuration;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
+
 /**
- * easylog 操作日志配置
- *
- * @author WangQingFei(qfwang666 @ 163.com)
- * @date 2022/5/1 22:33
+ * @author Gaosl
  */
+@Setter
+@Getter
 @ConfigurationProperties(prefix = "easylog")
 @Component
 public class EasyLogProperties {
@@ -29,27 +31,4 @@ public class EasyLogProperties {
      */
     private boolean banner = true;
 
-    public boolean isEnable() {
-        return enable;
-    }
-
-    public void setEnable(boolean enable) {
-        this.enable = enable;
-    }
-
-    public String getPlatform() {
-        return platform;
-    }
-
-    public void setPlatform(String platform) {
-        this.platform = platform;
-    }
-
-    public boolean isBanner() {
-        return banner;
-    }
-
-    public void setBanner(boolean banner) {
-        this.banner = banner;
-    }
 }
