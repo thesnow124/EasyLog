@@ -3,7 +3,6 @@ package com.github.easylog.aop;
 import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.compare.Equator;
 import com.github.easylog.compare.FieldInfo;
-import com.github.easylog.configuration.EasyLogProperties;
 import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.model.EasyLogOps;
@@ -45,13 +44,11 @@ public class EasyLogAspect {
 
     private EasyLogParser easyLogParser;
 
-    private EasyLogProperties easyLogProperties;
 
-    public EasyLogAspect(ILogRecordService logRecordService, IOperatorService operatorService, EasyLogParser easyLogParser, EasyLogProperties easyLogProperties) {
+    public EasyLogAspect(ILogRecordService logRecordService, IOperatorService operatorService, EasyLogParser easyLogParser) {
         this.logRecordService = logRecordService;
         this.operatorService = operatorService;
         this.easyLogParser = easyLogParser;
-        this.easyLogProperties = easyLogProperties;
     }
 
     /**
@@ -226,7 +223,7 @@ public class EasyLogAspect {
             easyLogInfo.setContent(templateMap.get(contentKey));
             String[] array = Arrays.stream(paramKeyList)
                     .map(templateMap::get)
-                   .toArray(String[]::new);
+                    .toArray(String[]::new);
             easyLogInfo.setParamList(array);
             List<?> list = JsonUtils.toObject(easyLogOps.getDetails(), List.class);
             if (!CollectionUtils.isEmpty(list)) {
