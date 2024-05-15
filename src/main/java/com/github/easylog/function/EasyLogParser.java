@@ -128,7 +128,6 @@ public class EasyLogParser implements BeanFactoryAware {
      */
     public String getFuncVal(Map<String, String> funcValBeforeExecutionMap, String funcName, String paramName, String param) {
         String val = null;
-        //todo 接入国际化
         //todo 支持线程私有变量，即用户手动输入
         //todo 加密日志
         if (!CollectionUtils.isEmpty(funcValBeforeExecutionMap)) {

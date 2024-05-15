@@ -216,6 +216,7 @@ public class EasyLogAspect {
             easyLogInfo.setDetails(templateMap.get(easyLogOps.getDetails()));
             String contentKey = easyLogOps.getSuccess();
             String[] paramKeyList = easyLogOps.getSuccessParamList();
+            //todo 如果是失败，应该无视内容，把失败模板传进去
             if (!executeResult.isSuccess()) {
                 contentKey = easyLogOps.getFail();
                 paramKeyList = easyLogOps.getFailParamList();
