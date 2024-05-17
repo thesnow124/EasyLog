@@ -36,7 +36,7 @@ public class EasyLogInfo {
 	/**
 	 * 接口参数
 	 */
-	private Map<String, Object> paramMap;
+	private Map<String, Object> param;
 
 
 	/**
@@ -48,6 +48,11 @@ public class EasyLogInfo {
 	 * 操作者
 	 */
 	private String operator;
+
+	/**
+	 * 操作时间 时间戳单位：ms
+	 */
+	private Long operateTime;
 
 	/**
 	 * 业务id
@@ -72,12 +77,7 @@ public class EasyLogInfo {
 	/**
 	 * 操作参数
 	 */
-	private String[] paramList;
-
-	/**
-	 * 操作时间 时间戳单位：ms
-	 */
-	private Long operateTime;
+	private String[] contentParam;
 
 	/**
 	 * 操作花费的时间 单位：ms
@@ -97,15 +97,24 @@ public class EasyLogInfo {
 	private String errorMsg;
 
 	/**
+	 * 异常堆栈信息
+	 */
+	private String stackTrace;
+
+
+	/**
 	 * 详细
 	 */
-	private String details;
+	private String detail;
 
 	/**
 	 * 详细的字段变更
 	 */
 	private List<FieldInfo> fieldInfoList;
 
-
+	/**
+	 * 记录条件
+	 */
+	private String condition;
 
 }

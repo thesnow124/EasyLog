@@ -1,6 +1,6 @@
 package com.github.easylog.compare;
 
-import com.github.easylog.util.JsonUtils;
+import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.reflect.Field;
@@ -41,7 +41,7 @@ public class Equator {
                 .peek(f -> f.setAccessible(true))
                 .collect(Collectors.toMap(Field::getName, f -> {
                     try {
-                        return JsonUtils.toJSONString(f.get(bean));
+                        return JSON.toJSONString(f.get(bean));
                     } catch (IllegalAccessException e) {
                         log.error("", e);
                     }

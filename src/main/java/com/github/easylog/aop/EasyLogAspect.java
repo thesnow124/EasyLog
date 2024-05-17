@@ -1,5 +1,6 @@
 package com.github.easylog.aop;
 
+import com.alibaba.fastjson.JSON;
 import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.compare.Equator;
 import com.github.easylog.compare.FieldInfo;
@@ -9,9 +10,9 @@ import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
-import com.github.easylog.util.JsonUtils;
 import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -43,7 +44,6 @@ public class EasyLogAspect {
     private IOperatorService operatorService;
 
     private EasyLogParser easyLogParser;
-
 
     public EasyLogAspect(ILogRecordService logRecordService, IOperatorService operatorService, EasyLogParser easyLogParser) {
         this.logRecordService = logRecordService;
@@ -101,8 +101,8 @@ public class EasyLogAspect {
             }
             String[] nameArray = methodSignature.getParameterNames();
             Object[] valueArray = joinPoint.getArgs();
-            Map<String, Object> paramMap = buildRequestParam(nameArray, valueArray);
-            executeResult.setParamMap(paramMap);
+            Map<String, Object> param = buildRequestParam(nameArray, valueArray);
+            executeResult.setParam(param);
         } catch (Exception e) {
             log.info("解析通用信息发生异常", e);
         }
@@ -131,14 +131,10 @@ public class EasyLogAspect {
     }
 
     private void after(List<EasyLogOps> easyLogOpsList, MethodExecuteResult executeResult, Method method, List<String> expressTemplate, Map<String, String> customFunctionExecResultMap, Object[] args, Class<?> targetClass, Object result) {
-        boolean existsNoFailTemp = easyLogOpsList.stream()
-                .anyMatch(easyLogOps -> ObjectUtils.isEmpty(easyLogOps.getFail()));
-        if (!executeResult.isSuccess() && existsNoFailTemp) {
-            log.warn("[{}] 方法执行失败，EasyLog 失败模板没有配置", method.getName());
-        } else {
-            Map<String, String> templateMap = easyLogParser.processAfterExec(expressTemplate, customFunctionExecResultMap, method, args, targetClass, executeResult.getErrMsg(), result);
-            sendLog(easyLogOpsList, result, executeResult, templateMap);
-        }
+        //todo 当用户手动填写内容时，对应的模板方法就不应该被执行了
+        Map<String, String> templateMap = easyLogParser.processAfterExec(expressTemplate, customFunctionExecResultMap, method, args, targetClass, executeResult.getErrMsg(), result);
+        sendLog(easyLogOpsList, result, executeResult, templateMap);
+
     }
 
     /**
@@ -150,11 +146,15 @@ public class EasyLogAspect {
      * @param templateMap   templateMap
      */
     private void sendLog(List<EasyLogOps> easyLogOps, Object result, MethodExecuteResult executeResult, Map<String, String> templateMap) {
+        //todo 留出自定义字段,及自定义字段的填充逻辑
         List<EasyLogInfo> easyLogInfos = createEasyLogInfo(templateMap, easyLogOps, executeResult);
         if (!CollectionUtils.isEmpty(easyLogInfos)) {
             easyLogInfos.forEach(easyLogInfo -> {
-                easyLogInfo.setResult(JsonUtils.toJSONString(result));
+                easyLogInfo.setResult(JSON.toJSONString(result));
                 easyLogInfo.setSuccess(executeResult.isSuccess());
+                if (Objects.nonNull(executeResult.getThrowable())){
+                    easyLogInfo.setStackTrace(ExceptionUtils.getStackTrace(executeResult.getThrowable()));
+                }
                 easyLogInfo.setErrorMsg(executeResult.getErrMsg());
                 easyLogInfo.setExecuteTime(executeResult.getExecuteTime());
                 easyLogInfo.setOperateTime(executeResult.getOperateTime());
@@ -162,6 +162,7 @@ public class EasyLogAspect {
                 easyLogInfo.setUrl(executeResult.getUrl());
                 easyLogInfo.setHttpMethod(executeResult.getHttpMethod());
                 easyLogInfo.setClassMethod(executeResult.getClassMethod());
+                easyLogInfo.setParam(executeResult.getParam());
                 logRecordService.record(easyLogInfo);
             });
         }
@@ -195,11 +196,8 @@ public class EasyLogAspect {
     private List<EasyLogInfo> createEasyLogInfo(Map<String, String> templateMap, List<EasyLogOps> easyLogOpsList, MethodExecuteResult executeResult) {
         List<EasyLogInfo> easyLogInfos = new ArrayList<>();
         for (EasyLogOps easyLogOps : easyLogOpsList) {
-            //记录条件为 false，则不记录
-            if (Boolean.FALSE.toString().equalsIgnoreCase(templateMap.get(easyLogOps.getCondition()))) {
-                continue;
-            }
             EasyLogInfo easyLogInfo = new EasyLogInfo();
+            easyLogInfo.setCondition(easyLogOps.getCondition());
             String platform = templateMap.get(easyLogOps.getPlatform());
             if (ObjectUtils.isEmpty(platform)) {
                 platform = operatorService.getPlatform();
@@ -213,7 +211,7 @@ public class EasyLogAspect {
             easyLogInfo.setType(easyLogOps.getType());
             easyLogInfo.setOperator(operator);
             easyLogInfo.setBizNo(templateMap.get(easyLogOps.getBizNo()));
-            easyLogInfo.setDetails(templateMap.get(easyLogOps.getDetails()));
+            easyLogInfo.setDetail(templateMap.get(easyLogOps.getDetails()));
             String contentKey = easyLogOps.getSuccess();
             String[] paramKeyList = easyLogOps.getSuccessParamList();
             //todo 如果是失败，应该无视内容，把失败模板传进去
@@ -225,8 +223,8 @@ public class EasyLogAspect {
             String[] array = Arrays.stream(paramKeyList)
                     .map(templateMap::get)
                     .toArray(String[]::new);
-            easyLogInfo.setParamList(array);
-            List<?> list = JsonUtils.toObject(easyLogOps.getDetails(), List.class);
+            easyLogInfo.setContentParam(array);
+            List<?> list = JSON.parseArray(easyLogOps.getDetails(), List.class);
             if (!CollectionUtils.isEmpty(list)) {
                 Object oldBean = list.stream().findFirst().orElse(null);
                 Object newBean = list.stream().skip(1).findFirst().orElse(null);

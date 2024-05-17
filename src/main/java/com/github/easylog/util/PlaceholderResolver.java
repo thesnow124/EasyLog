@@ -1,6 +1,9 @@
 package com.github.easylog.util;
 
+import org.apache.commons.lang3.StringUtils;
+
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.function.Function;
 import java.util.stream.Stream;
@@ -70,6 +73,9 @@ public class PlaceholderResolver {
      * @return
      */
     public String resolve(String content, String[] values) {
+        if (StringUtils.isBlank(content) || Objects.isNull(values)) {
+            return content;
+        }
         int start = content.indexOf(this.placeholderPrefix);
         if (start == -1) {
             return content;

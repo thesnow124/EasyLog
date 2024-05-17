@@ -42,7 +42,7 @@ public @interface EasyLog {
     /**
      * 成功模板
      */
-    String success();
+    String success() default "";
 
     /**
      * 成功参数
@@ -69,5 +69,6 @@ public @interface EasyLog {
      * 记录条件 默认 true
      */
     String condition() default "";
+
 
 }

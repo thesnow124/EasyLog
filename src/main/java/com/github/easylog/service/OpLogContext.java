@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * @author Gaosl
@@ -22,7 +23,10 @@ public class OpLogContext {
 
 
     public static void initOpInfo() {
-        logInfoList.set(new ArrayList<>());
+        List<EasyLogInfo> easyLogInfos = logInfoList.get();
+        if (Objects.isNull(easyLogInfos)) {
+            logInfoList.set(new ArrayList<>());
+        }
     }
 
     public static List<EasyLogInfo> getOpInfo() {
@@ -32,4 +36,6 @@ public class OpLogContext {
     public static void addAllLogInfoList(List<EasyLogInfo> list) {
         logInfoList.set(list);
     }
+
+
 }

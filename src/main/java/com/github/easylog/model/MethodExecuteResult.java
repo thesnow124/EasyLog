@@ -33,7 +33,7 @@ public class MethodExecuteResult {
 	/**
 	 * 接口参数
 	 */
-	private Map<String, Object> paramMap;
+	private Map<String, Object> param;
 
 
 
