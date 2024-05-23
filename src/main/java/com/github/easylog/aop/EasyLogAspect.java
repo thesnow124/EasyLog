@@ -1,6 +1,7 @@
 package com.github.easylog.aop;
 
 import com.alibaba.fastjson.JSON;
+import com.alibaba.fastjson.JSONArray;
 import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.compare.Equator;
 import com.github.easylog.compare.FieldInfo;
@@ -66,6 +67,7 @@ public class EasyLogAspect {
      */
     @Around("pointCut()")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
+        //todo 切面及切面方法执行成功，记录了一条成功日志。但是整体事务回滚了，这个日志就是个错误日志。解决办法：1、（思路不清晰）这个日志，切面所在的事务后提交，事务回滚则记录失败状态；
         MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
         Method method = methodSignature.getMethod();
         Object[] args = joinPoint.getArgs();
@@ -118,7 +120,7 @@ public class EasyLogAspect {
 
         //方法后逻辑
         try {
-            //todo 默认顺序，提供异步的口子（复制threadLocal）
+            //todo 默认顺序，提供异步的口子（复制threadLocal）,这里如果使用传递easyLogOpsList，需要考虑一个线程里多个方法都使用到注解的情况
             after(easyLogOpsList, executeResult, method, expressTemplateList, customFunctionExecResultMap, args, targetClass, result);
         } catch (Exception e) {
             log.info("方法后逻辑发生异常", e);
@@ -152,7 +154,7 @@ public class EasyLogAspect {
             easyLogInfos.forEach(easyLogInfo -> {
                 easyLogInfo.setResult(JSON.toJSONString(result));
                 easyLogInfo.setSuccess(executeResult.isSuccess());
-                if (Objects.nonNull(executeResult.getThrowable())){
+                if (Objects.nonNull(executeResult.getThrowable())) {
                     easyLogInfo.setStackTrace(ExceptionUtils.getStackTrace(executeResult.getThrowable()));
                 }
                 easyLogInfo.setErrorMsg(executeResult.getErrMsg());
@@ -197,7 +199,7 @@ public class EasyLogAspect {
         List<EasyLogInfo> easyLogInfos = new ArrayList<>();
         for (EasyLogOps easyLogOps : easyLogOpsList) {
             EasyLogInfo easyLogInfo = new EasyLogInfo();
-            easyLogInfo.setCondition(easyLogOps.getCondition());
+            easyLogInfo.setCondition(templateMap.get(easyLogOps.getCondition()));
             String platform = templateMap.get(easyLogOps.getPlatform());
             if (ObjectUtils.isEmpty(platform)) {
                 platform = operatorService.getPlatform();
@@ -224,13 +226,21 @@ public class EasyLogAspect {
                     .map(templateMap::get)
                     .toArray(String[]::new);
             easyLogInfo.setContentParam(array);
-            List<?> list = JSON.parseArray(easyLogOps.getDetails(), List.class);
-            if (!CollectionUtils.isEmpty(list)) {
-                Object oldBean = list.stream().findFirst().orElse(null);
-                Object newBean = list.stream().skip(1).findFirst().orElse(null);
-                List<FieldInfo> diffField = Equator.getDiffField(oldBean, newBean);
-                easyLogInfo.setFieldInfoList(diffField);
+            Object o = JSON.parse(easyLogInfo.getDetail());
+            Object oldBean = null;
+            //默认为新增
+            Object newBean = o;
+            if (o instanceof JSONArray) {
+                List<?> list = JSON.parseArray(easyLogOps.getDetails(), List.class);
+                if (!CollectionUtils.isEmpty(list)) {
+                    oldBean = list.stream().findFirst().orElse(null);
+                    newBean = list.stream().skip(1).findFirst().orElse(null);
+
+                }
             }
+            List<FieldInfo> diffField = Equator.getDiffField(oldBean, newBean);
+            easyLogInfo.setFieldInfoList(diffField);
+
             easyLogInfos.add(easyLogInfo);
         }
 
