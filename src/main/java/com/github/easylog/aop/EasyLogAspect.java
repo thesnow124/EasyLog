@@ -11,8 +11,10 @@ import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
+import com.github.easylog.service.OpLogContext;
 import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -39,6 +41,7 @@ import java.util.stream.Collectors;
 @Component
 @Slf4j
 public class EasyLogAspect {
+
 
     private ILogRecordService logRecordService;
 
@@ -109,50 +112,29 @@ public class EasyLogAspect {
             log.info("解析通用信息发生异常", e);
         }
 
+        List<EasyLogInfo> easyLogInfoList;
         //方法逻辑
-        Object result = null;
         try {
+            OpLogContext.pushLogStack(new ArrayList<>());
+            Object result;
             result = joinPoint.proceed();
-            executeResult.calcExecuteTime();
+            executeResult.calcExecuteTime(result);
         } catch (Throwable e) {
             executeResult.exception(e);
+        } finally {
+            easyLogInfoList = OpLogContext.popLogStack();
+            Stack<List<EasyLogInfo>> logStack = OpLogContext.getLogStack();
+            if (CollectionUtils.isEmpty(logStack)) {
+                OpLogContext.removeLogStack();
+            }
         }
 
         //方法后逻辑
         try {
-            //todo 默认顺序，提供异步的口子（复制threadLocal）,这里如果使用传递easyLogOpsList，需要考虑一个线程里多个方法都使用到注解的情况
-            after(easyLogOpsList, executeResult, method, expressTemplateList, customFunctionExecResultMap, args, targetClass, result);
-        } catch (Exception e) {
-            log.info("方法后逻辑发生异常", e);
-        }
-        //抛出异常
-        if (!executeResult.isSuccess()) {
-            throw executeResult.getThrowable();
-        }
-        return result;
-    }
-
-    private void after(List<EasyLogOps> easyLogOpsList, MethodExecuteResult executeResult, Method method, List<String> expressTemplate, Map<String, String> customFunctionExecResultMap, Object[] args, Class<?> targetClass, Object result) {
-        //todo 当用户手动填写内容时，对应的模板方法就不应该被执行了
-        Map<String, String> templateMap = easyLogParser.processAfterExec(expressTemplate, customFunctionExecResultMap, method, args, targetClass, executeResult.getErrMsg(), result);
-        sendLog(easyLogOpsList, result, executeResult, templateMap);
-
-    }
-
-    /**
-     * 发送日志
-     *
-     * @param easyLogOps    easyLogOps
-     * @param result        result
-     * @param executeResult executeResult
-     * @param templateMap   templateMap
-     */
-    private void sendLog(List<EasyLogOps> easyLogOps, Object result, MethodExecuteResult executeResult, Map<String, String> templateMap) {
-        //todo 留出自定义字段,及自定义字段的填充逻辑
-        List<EasyLogInfo> easyLogInfos = createEasyLogInfo(templateMap, easyLogOps, executeResult);
-        if (!CollectionUtils.isEmpty(easyLogInfos)) {
+            Map<String, String> templateMap = easyLogParser.processAfterExec(expressTemplateList, customFunctionExecResultMap, method, args, targetClass, executeResult.getErrMsg(), executeResult.getResult());
+            List<EasyLogInfo> easyLogInfos = createEasyLogInfo(templateMap, easyLogOpsList, executeResult, easyLogInfoList);
             easyLogInfos.forEach(easyLogInfo -> {
-                easyLogInfo.setResult(JSON.toJSONString(result));
+                easyLogInfo.setResult(JSON.toJSONString(executeResult.getResult()));
                 easyLogInfo.setSuccess(executeResult.isSuccess());
                 if (Objects.nonNull(executeResult.getThrowable())) {
                     easyLogInfo.setStackTrace(ExceptionUtils.getStackTrace(executeResult.getThrowable()));
@@ -167,8 +149,16 @@ public class EasyLogAspect {
                 easyLogInfo.setParam(executeResult.getParam());
                 logRecordService.record(easyLogInfo);
             });
+        } catch (Exception e) {
+            log.info("方法后逻辑发生异常", e);
         }
+        //抛出异常
+        if (!executeResult.isSuccess()) {
+            throw executeResult.getThrowable();
+        }
+        return executeResult.getResult();
     }
+
 
     private Map<String, Object> buildRequestParam(String[] paramNames, Object[] paramValues) {
         Map<String, Object> requestParams = new HashMap<>(16);
@@ -187,66 +177,6 @@ public class EasyLogAspect {
         }
         return requestParams;
     }
-
-    /**
-     * 创建操作日志实体
-     *
-     * @param templateMap    templateMap
-     * @param easyLogOpsList easyLogOpsList
-     * @return List<EasyLogInfo>
-     */
-    private List<EasyLogInfo> createEasyLogInfo(Map<String, String> templateMap, List<EasyLogOps> easyLogOpsList, MethodExecuteResult executeResult) {
-        List<EasyLogInfo> easyLogInfos = new ArrayList<>();
-        for (EasyLogOps easyLogOps : easyLogOpsList) {
-            EasyLogInfo easyLogInfo = new EasyLogInfo();
-            easyLogInfo.setCondition(templateMap.get(easyLogOps.getCondition()));
-            String platform = templateMap.get(easyLogOps.getPlatform());
-            if (ObjectUtils.isEmpty(platform)) {
-                platform = operatorService.getPlatform();
-            }
-            easyLogInfo.setPlatform(platform);
-            String operator = templateMap.get(easyLogOps.getOperator());
-            if (ObjectUtils.isEmpty(operator)) {
-                operator = operatorService.getOperator();
-            }
-            easyLogInfo.setModule(easyLogOps.getModule());
-            easyLogInfo.setType(easyLogOps.getType());
-            easyLogInfo.setOperator(operator);
-            easyLogInfo.setBizNo(templateMap.get(easyLogOps.getBizNo()));
-            easyLogInfo.setDetail(templateMap.get(easyLogOps.getDetails()));
-            String contentKey = easyLogOps.getSuccess();
-            String[] paramKeyList = easyLogOps.getSuccessParamList();
-            //todo 如果是失败，应该无视内容，把失败模板传进去
-            if (!executeResult.isSuccess()) {
-                contentKey = easyLogOps.getFail();
-                paramKeyList = easyLogOps.getFailParamList();
-            }
-            easyLogInfo.setContent(templateMap.get(contentKey));
-            String[] array = Arrays.stream(paramKeyList)
-                    .map(templateMap::get)
-                    .toArray(String[]::new);
-            easyLogInfo.setContentParam(array);
-            Object o = JSON.parse(easyLogInfo.getDetail());
-            Object oldBean = null;
-            //默认为新增
-            Object newBean = o;
-            if (o instanceof JSONArray) {
-                List<?> list = JSON.parseArray(easyLogOps.getDetails(), List.class);
-                if (!CollectionUtils.isEmpty(list)) {
-                    oldBean = list.stream().findFirst().orElse(null);
-                    newBean = list.stream().skip(1).findFirst().orElse(null);
-
-                }
-            }
-            List<FieldInfo> diffField = Equator.getDiffField(oldBean, newBean);
-            easyLogInfo.setFieldInfoList(diffField);
-
-            easyLogInfos.add(easyLogInfo);
-        }
-
-        return easyLogInfos;
-    }
-
 
     /**
      * 将注解转为实体
@@ -288,6 +218,75 @@ public class EasyLogAspect {
         return set.stream()
                 .filter(s -> !ObjectUtils.isEmpty(s))
                 .collect(Collectors.toList());
+    }
+
+
+    /**
+     * 创建操作日志实体
+     *
+     * @param templateMap    templateMap
+     * @param easyLogOpsList easyLogOpsList
+     * @return List<EasyLogInfo>
+     */
+    private List<EasyLogInfo> createEasyLogInfo(Map<String, String> templateMap, List<EasyLogOps> easyLogOpsList, MethodExecuteResult executeResult,List<EasyLogInfo> easyLogInfoList) {
+        List<EasyLogInfo> easyLogInfos = new ArrayList<>();
+        for (EasyLogOps easyLogOps : easyLogOpsList) {
+            EasyLogInfo easyLogInfo = new EasyLogInfo();
+            easyLogInfo.setCondition(templateMap.get(easyLogOps.getCondition()));
+
+            String platform = templateMap.getOrDefault(easyLogOps.getPlatform(), operatorService.getPlatform());
+            easyLogInfo.setPlatform(platform);
+            String operator = templateMap.getOrDefault(easyLogOps.getOperator(), operatorService.getOperator());
+            easyLogInfo.setOperator(operator);
+
+            easyLogInfo.setModule(easyLogOps.getModule());
+            easyLogInfo.setType(easyLogOps.getType());
+            easyLogInfo.setBizNo(templateMap.get(easyLogOps.getBizNo()));
+            easyLogInfo.setDetail(templateMap.get(easyLogOps.getDetails()));
+            String contentKey = easyLogOps.getSuccess();
+            String[] paramKeyList = easyLogOps.getSuccessParamList();
+            if (!executeResult.isSuccess()) {
+                contentKey = easyLogOps.getFail();
+                paramKeyList = easyLogOps.getFailParamList();
+            }
+            easyLogInfo.setContent(templateMap.get(contentKey));
+            String[] array = Arrays.stream(paramKeyList)
+                    .map(templateMap::get)
+                    .toArray(String[]::new);
+            easyLogInfo.setContentParam(array);
+
+            if (StringUtils.isNotBlank(easyLogInfo.getDetail())) {
+                Object o=null;
+                try {
+                    o = JSON.parse(easyLogInfo.getDetail());
+                }catch (Exception e){
+                    log.info("反序列化失败 easyLogInfo.getDetail()=" + easyLogInfo.getDetail(), e);
+                }
+                Object oldBean = null;
+                //默认为新增
+                Object newBean = o;
+                if (o instanceof JSONArray) {
+                    List<?> list = JSON.parseArray(easyLogOps.getDetails(), List.class);
+                    if (!CollectionUtils.isEmpty(list)) {
+                        oldBean = list.stream().findFirst().orElse(null);
+                        newBean = list.stream().skip(1).findFirst().orElse(null);
+                    }
+                }
+                List<FieldInfo> diffField = Equator.getDiffField(oldBean, newBean);
+                easyLogInfo.setFieldInfoList(diffField);
+            }
+            easyLogInfos.add(easyLogInfo);
+        }
+        if (!CollectionUtils.isEmpty(easyLogInfoList)) {
+            easyLogInfoList.forEach(o -> {
+                String platform = templateMap.getOrDefault(o.getPlatform(), operatorService.getPlatform());
+                o.setPlatform(platform);
+                String operator = templateMap.getOrDefault(o.getOperator(), operatorService.getOperator());
+                o.setOperator(operator);
+                easyLogInfos.add(o);
+            });
+        }
+        return easyLogInfos;
     }
 
 }

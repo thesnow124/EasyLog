@@ -4,9 +4,7 @@ import com.github.easylog.model.EasyLogInfo;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * @author Gaosl
@@ -16,25 +14,43 @@ import java.util.Objects;
  */
 @Slf4j
 @NoArgsConstructor
-//todo 待完善
 public class OpLogContext {
 
-    private static ThreadLocal<List<EasyLogInfo>> logInfoList = new ThreadLocal<>();
+    private static ThreadLocal<Stack<List<EasyLogInfo>>> LOG_INFO_STACK = new ThreadLocal<>();
 
 
-    public static void initOpInfo() {
-        List<EasyLogInfo> easyLogInfos = logInfoList.get();
-        if (Objects.isNull(easyLogInfos)) {
-            logInfoList.set(new ArrayList<>());
+    public static Stack<List<EasyLogInfo>> getLogStack() {
+        return LOG_INFO_STACK.get();
+    }
+
+    public static void pushLogStack(List<EasyLogInfo> list) {
+        Stack<List<EasyLogInfo>> stack = LOG_INFO_STACK.get();
+        if (Objects.isNull(stack)) {
+            stack= new Stack<>();
         }
+        stack.push(list);
+        LOG_INFO_STACK.set(stack);
     }
 
-    public static List<EasyLogInfo> getOpInfo() {
-        return logInfoList.get();
+    public static void peekAndAddLogStack(List<EasyLogInfo> list) {
+        Stack<List<EasyLogInfo>> stack = LOG_INFO_STACK.get();
+        if (Objects.isNull(stack)) {
+            return;
+        }
+        List<EasyLogInfo> peek = stack.peek();
+        peek.addAll(list);
     }
 
-    public static void addAllLogInfoList(List<EasyLogInfo> list) {
-        logInfoList.set(list);
+    public static List<EasyLogInfo> popLogStack() {
+        Stack<List<EasyLogInfo>> stack = LOG_INFO_STACK.get();
+        if (Objects.isNull(stack)) {
+            return null;
+        }
+        return stack.pop();
+    }
+
+    public static void removeLogStack() {
+        LOG_INFO_STACK.remove();
     }
 
 

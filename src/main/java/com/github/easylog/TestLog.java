@@ -3,6 +3,7 @@ package com.github.easylog;
 import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.annotation.EasyLogs;
 import com.github.easylog.constants.OperateType;
+import com.github.easylog.util.EasyLogUtil;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class TestLog {
             @EasyLog(module = "用户管理", type = OperateType.READ, success = "测试多个日志-2： {getBeforeRealNameByName{#name}}")
     })
     public void manyLog(String name) {
+        EasyLogUtil.record(name, "1", "1", "1", new String[]{"1", "2"});
 
     }
 
