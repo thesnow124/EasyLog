@@ -254,22 +254,21 @@ public class EasyLogAspect {
                     .map(templateMap::get)
                     .toArray(String[]::new);
             easyLogInfo.setContentParam(array);
-
             if (StringUtils.isNotBlank(easyLogInfo.getDetail())) {
-                Object o=null;
+                Object o = null;
                 try {
                     o = JSON.parse(easyLogInfo.getDetail());
-                }catch (Exception e){
+                } catch (Exception e) {
                     log.info("反序列化失败 easyLogInfo.getDetail()=" + easyLogInfo.getDetail(), e);
                 }
                 Object oldBean = null;
                 //默认为新增
                 Object newBean = o;
                 if (o instanceof JSONArray) {
-                    List<?> list = JSON.parseArray(easyLogOps.getDetails(), List.class);
+                    List<String> list = JSON.parseArray(easyLogOps.getDetails(), String.class);
                     if (!CollectionUtils.isEmpty(list)) {
-                        oldBean = list.stream().findFirst().orElse(null);
-                        newBean = list.stream().skip(1).findFirst().orElse(null);
+                        oldBean = list.stream().findFirst().map(JSON::parse).orElse(null);
+                        newBean = list.stream().skip(1).findFirst().map(JSON::parse).orElse(null);
                     }
                 }
                 List<FieldInfo> diffField = Equator.getDiffField(oldBean, newBean);
@@ -278,12 +277,32 @@ public class EasyLogAspect {
             easyLogInfos.add(easyLogInfo);
         }
         if (!CollectionUtils.isEmpty(easyLogInfoList)) {
-            easyLogInfoList.forEach(o -> {
-                String platform = templateMap.getOrDefault(o.getPlatform(), operatorService.getPlatform());
-                o.setPlatform(platform);
-                String operator = templateMap.getOrDefault(o.getOperator(), operatorService.getOperator());
-                o.setOperator(operator);
-                easyLogInfos.add(o);
+            easyLogInfoList.forEach(logInfo -> {
+                String platform = templateMap.getOrDefault(logInfo.getPlatform(), operatorService.getPlatform());
+                logInfo.setPlatform(platform);
+                String operator = templateMap.getOrDefault(logInfo.getOperator(), operatorService.getOperator());
+                logInfo.setOperator(operator);
+                if (StringUtils.isNotBlank(logInfo.getDetail())) {
+                    Object o = null;
+                    try {
+                        o = JSON.parse(logInfo.getDetail());
+                    } catch (Exception e) {
+                        log.info("反序列化失败 easyLogInfo.getDetail()=" + logInfo.getDetail(), e);
+                    }
+                    Object oldBean = null;
+                    //默认为新增
+                    Object newBean = o;
+                    if (o instanceof JSONArray) {
+                        List<String> list = JSON.parseArray(logInfo.getDetail(), String.class);
+                        if (!CollectionUtils.isEmpty(list)) {
+                            oldBean = list.stream().findFirst().map(JSON::parse).orElse(null);
+                            newBean = list.stream().skip(1).findFirst().map(JSON::parse).orElse(null);
+                        }
+                    }
+                    List<FieldInfo> diffField = Equator.getDiffField(oldBean, newBean);
+                    logInfo.setFieldInfoList(diffField);
+                }
+                easyLogInfos.add(logInfo);
             });
         }
         return easyLogInfos;

@@ -1,8 +1,9 @@
 package com.github.easylog.util;
 
-import com.github.easylog.compare.FieldInfo;
+import com.alibaba.fastjson.JSON;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.service.OpLogContext;
+import com.google.common.collect.Lists;
 
 import java.util.Collections;
 import java.util.List;
@@ -33,25 +34,25 @@ public class EasyLogUtil {
         record(Collections.singletonList(o));
     }
 
-    public static void record(String bizNo, String module, String type, String content, String[] contentParam, List<FieldInfo> fieldInfoList) {
+    public static void record(String bizNo, String module, String type, String content, String[] contentParam, Object oldBean, Object newBean) {
         EasyLogInfo easyLogInfo = new EasyLogInfo();
         easyLogInfo.setBizNo(bizNo);
         easyLogInfo.setModule(module);
         easyLogInfo.setType(type);
         easyLogInfo.setContent(content);
         easyLogInfo.setContentParam(contentParam);
-        easyLogInfo.setFieldInfoList(fieldInfoList);
+        easyLogInfo.setDetail(JSON.toJSONString(Lists.newArrayList(oldBean, newBean)));
+
         record(easyLogInfo);
     }
 
 
-
-    public static void record(String bizNo, String module, String type, List<FieldInfo> fieldInfoList) {
+    public static void record(String bizNo, String module, String type, Object oldBean, Object newBean) {
         EasyLogInfo easyLogInfo = new EasyLogInfo();
         easyLogInfo.setBizNo(bizNo);
         easyLogInfo.setModule(module);
         easyLogInfo.setType(type);
-        easyLogInfo.setFieldInfoList(fieldInfoList);
+        easyLogInfo.setDetail(JSON.toJSONString(Lists.newArrayList(oldBean, newBean)));
         record(easyLogInfo);
     }
 

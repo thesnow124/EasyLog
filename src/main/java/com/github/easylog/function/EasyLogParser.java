@@ -1,6 +1,7 @@
 package com.github.easylog.function;
 
 
+import com.alibaba.fastjson.JSON;
 import com.github.easylog.constants.EasyLogConsts;
 import com.github.easylog.context.EasyLogCachedExpressionEvaluator;
 import com.google.common.collect.Lists;
@@ -136,7 +137,7 @@ public class EasyLogParser implements BeanFactoryAware {
         }
         if ( customFunctionService.executeAround(funcName)) {
             String apply = customFunctionService.apply(funcName, param);
-            val = String.join(",", Lists.newArrayList(val, apply));
+            val = JSON.toJSONString(Lists.newArrayList(val, apply));
         }
         if (ObjectUtils.isEmpty(val)) {
             val = customFunctionService.apply(funcName, param);
