@@ -40,9 +40,11 @@ public class EasyLogParser implements BeanFactoryAware {
     private final EasyLogCachedExpressionEvaluator cachedExpressionEvaluator = new EasyLogCachedExpressionEvaluator();
 
     public Map<String, String> processAfterExec(List<String> expressTemplate, Map<String, String> funcValBeforeExecMap, Method method, Object[] args, Class<?> targetClass, String errMsg, Object result) {
-
         //如果接口执行完成，那根据执行结果选择应该执行那个
         HashMap<String, String> map = new HashMap<>();
+        if (CollectionUtils.isEmpty(expressTemplate)) {
+            return map;
+        }
         AnnotatedElementKey elementKey = new AnnotatedElementKey(method, targetClass);
         EvaluationContext evaluationContext = cachedExpressionEvaluator.createEvaluationContext(method, args, beanFactory, errMsg, result);
         for (String template : expressTemplate) {
@@ -84,6 +86,9 @@ public class EasyLogParser implements BeanFactoryAware {
      */
     public Map<String, String> processBeforeExec(List<String> templates, Method method, Object[] args, Class<?> targetClass) {
         HashMap<String, String> map = new HashMap<>();
+        if (CollectionUtils.isEmpty(templates)) {
+            return map;
+        }
         AnnotatedElementKey elementKey = new AnnotatedElementKey(method, targetClass);
         EvaluationContext evaluationContext = cachedExpressionEvaluator.createEvaluationContext(method, args, beanFactory, null, null);
         for (String template : templates) {
