@@ -49,8 +49,8 @@ public class Equator {
                         String s = split1.get(split1.size() - 1);
                         fieldDiff.setFieldName(s);
                     }
-                    fieldDiff.setOldFieldVal(o.getActual());
-                    fieldDiff.setNewFieldVal(o.getExpect());
+                    fieldDiff.setOldFieldVal((String) o.getActual());
+                    fieldDiff.setNewFieldVal((String) o.getExpect());
                     return fieldDiff;
                 }).collect(Collectors.toList());
     }

@@ -18,10 +18,16 @@ public class FieldInfo {
     /**
      * 老的属性值
      */
-    private Object oldFieldVal;
+    private String oldFieldVal;
 
     /**
      * 新的属性值
      */
-    private Object newFieldVal;
+    private String newFieldVal;
+
+
+    /**
+     * 详情属性值
+     */
+    private String val;
 }

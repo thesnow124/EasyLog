@@ -276,7 +276,7 @@ public class EasyLogAspect {
         } catch (Exception e) {
             log.info("反序列化失败 detail=" + detail, e);
             FieldInfo fieldDiff = new FieldInfo();
-            fieldDiff.setNewFieldVal(detail);
+            fieldDiff.setVal(detail);
             return Collections.singletonList(fieldDiff);
         }
         String oldBean = null;
@@ -290,7 +290,7 @@ public class EasyLogAspect {
             }
         } else {
             FieldInfo fieldDiff = new FieldInfo();
-            fieldDiff.setNewFieldVal(detail);
+            fieldDiff.setVal(detail);
             return Collections.singletonList(fieldDiff);
         }
         return Equator.getDiffField(oldBean, newBean);
