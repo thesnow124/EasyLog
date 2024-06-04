@@ -2,8 +2,13 @@ package com.github.easylog.compare;
 
 import com.alibaba.fastjson.JSON;
 import lombok.extern.slf4j.Slf4j;
+import me.codeleep.jsondiff.DefaultJsonDifference;
+import me.codeleep.jsondiff.common.model.JsonCompareResult;
+import me.codeleep.jsondiff.common.model.TravelPath;
+import me.codeleep.jsondiff.core.config.JsonComparedOption;
+import org.apache.commons.lang3.StringUtils;
+import org.springframework.util.CollectionUtils;
 
-import java.lang.reflect.Field;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -16,40 +21,57 @@ import java.util.stream.Collectors;
 @Slf4j
 public class Equator {
 
-    public static List<FieldInfo> getDiffField(Object oldBean, Object newBean) {
-        if (Objects.isNull(oldBean) && Objects.isNull(newBean)) {
+    public static List<FieldInfo> getDiffField(String oldBean, String newBean) {
+        if (Objects.isNull(oldBean)) {
+            oldBean = "{}";
+        }
+        if (Objects.isNull(newBean)) {
+            newBean = "{}";
+        }
+        if (!isJsonString(oldBean) ||! isJsonString(newBean)) {
+            FieldInfo fieldDiff = new FieldInfo();
+            fieldDiff.setNewFieldVal(oldBean);
+            fieldDiff.setNewFieldVal(newBean);
+            return Collections.singletonList(fieldDiff);
+        }
+
+        JsonComparedOption jsonComparedOption = new JsonComparedOption().setIgnoreOrder(true);
+        JsonCompareResult jsonCompareResult = new DefaultJsonDifference()
+                .option(jsonComparedOption)
+                .detectDiff(newBean, oldBean);
+        return jsonCompareResult.getDefectsList().stream()
+                .filter(o -> !Objects.equals(o.getActual(), o.getExpect()))
+                .map(o -> {
+                    FieldInfo fieldDiff = new FieldInfo();
+                    String abstractTravelPath = Optional.ofNullable(o.getTravelPath()).map(TravelPath::getAbstractTravelPath).orElse("");
+                    List<String> split1 = split(abstractTravelPath, "\\.");
+                    if (!CollectionUtils.isEmpty(split1)) {
+                        String s = split1.get(split1.size() - 1);
+                        fieldDiff.setFieldName(s);
+                    }
+                    fieldDiff.setOldFieldVal(o.getActual());
+                    fieldDiff.setNewFieldVal(o.getExpect());
+                    return fieldDiff;
+                }).collect(Collectors.toList());
+    }
+
+    public static List<String> split(String listStr, String regex) {
+        if (StringUtils.isBlank(listStr)) {
             return new ArrayList<>();
         }
-        HashMap<String, String> oldMap = getMap(oldBean);
-        HashMap<String, String> newMap = getMap(newBean);
-        return Arrays.asList(oldMap.keySet(), newMap.keySet()).stream().flatMap(Collection::stream).map(k -> {
-            FieldInfo fieldDiff = new FieldInfo();
-            fieldDiff.setFieldName(k);
-            fieldDiff.setNewFieldVal(newMap.get(k));
-            fieldDiff.setOldFieldVal(oldMap.get(k));
-            return fieldDiff;
-        }).collect(Collectors.toList());
+        return Arrays.stream(listStr.split(regex))
+                .filter(StringUtils::isNotBlank)
+                .collect(Collectors.toList());
     }
 
-    private static HashMap<String, String> getMap(Object bean) {
-        if (Objects.isNull(bean)) {
-            return new HashMap<>();
+    public static boolean isJsonString(String str) {
+        boolean result = false;
+        try {
+            JSON.parse(str);
+            result = true;
+        } catch (Exception ignored) {
         }
-        Class<?> clazz = bean.getClass();
-        Field[] fieldList = clazz.getFields();
-        HashMap<String, String> map = (HashMap<String, String>) Arrays.stream(fieldList)
-                .peek(f -> f.setAccessible(true))
-                .collect(Collectors.toMap(Field::getName, f -> {
-                    try {
-                        return JSON.toJSONString(f.get(bean));
-                    } catch (IllegalAccessException e) {
-                        log.error("", e);
-                    }
-                    return null;
-                }, (v1, v2) -> v1));
-        return map;
-
+        return result;
     }
-
 
 }

@@ -84,6 +84,18 @@
             <artifactId>fastjson</artifactId>
             <version>2.0.50</version>
         </dependency>
+        <!-- https://mvnrepository.com/artifact/cn.xiaoandcai/json-diff -->
+        <dependency>
+            <groupId>cn.xiaoandcai</groupId>
+            <artifactId>json-diff</artifactId>
+            <version>4.1.4-RC1-RELEASE</version>
+        </dependency>
+        <!-- https://mvnrepository.com/artifact/cn.xiaoandcai/json-diff-impl-fastjson -->
+        <dependency>
+            <groupId>cn.xiaoandcai</groupId>
+            <artifactId>json-diff-impl-fastjson</artifactId>
+            <version>4.1.4-RC1-RELEASE</version>
+        </dependency>
 
     </dependencies>
 

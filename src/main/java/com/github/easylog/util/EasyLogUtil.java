@@ -55,6 +55,14 @@ public class EasyLogUtil {
         easyLogInfo.setDetail(JSON.toJSONString(Lists.newArrayList(oldBean, newBean)));
         record(easyLogInfo);
     }
+    public static void record(String bizNo, String module, String type, Object bean) {
+        EasyLogInfo easyLogInfo = new EasyLogInfo();
+        easyLogInfo.setBizNo(bizNo);
+        easyLogInfo.setModule(module);
+        easyLogInfo.setType(type);
+        easyLogInfo.setDetail(JSON.toJSONString(bean));
+        record(easyLogInfo);
+    }
 
 
 }

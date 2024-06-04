@@ -14,7 +14,6 @@ import com.github.easylog.service.IOperatorService;
 import com.github.easylog.service.OpLogContext;
 import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -228,7 +227,7 @@ public class EasyLogAspect {
      * @param easyLogOpsList easyLogOpsList
      * @return List<EasyLogInfo>
      */
-    private List<EasyLogInfo> createEasyLogInfo(Map<String, String> templateMap, List<EasyLogOps> easyLogOpsList, MethodExecuteResult executeResult,List<EasyLogInfo> easyLogInfoList) {
+    private List<EasyLogInfo> createEasyLogInfo(Map<String, String> templateMap, List<EasyLogOps> easyLogOpsList, MethodExecuteResult executeResult, List<EasyLogInfo> easyLogInfoList) {
         List<EasyLogInfo> easyLogInfos = new ArrayList<>();
         for (EasyLogOps easyLogOps : easyLogOpsList) {
             EasyLogInfo easyLogInfo = new EasyLogInfo();
@@ -254,26 +253,7 @@ public class EasyLogAspect {
                     .map(templateMap::get)
                     .toArray(String[]::new);
             easyLogInfo.setContentParam(array);
-            if (StringUtils.isNotBlank(easyLogInfo.getDetail())) {
-                Object o = null;
-                try {
-                    o = JSON.parse(easyLogInfo.getDetail());
-                } catch (Exception e) {
-                    log.info("反序列化失败 easyLogInfo.getDetail()=" + easyLogInfo.getDetail(), e);
-                }
-                Object oldBean = null;
-                //默认为新增
-                Object newBean = o;
-                if (o instanceof JSONArray) {
-                    List<String> list = JSON.parseArray(easyLogOps.getDetails(), String.class);
-                    if (!CollectionUtils.isEmpty(list)) {
-                        oldBean = list.stream().findFirst().map(JSON::parse).orElse(null);
-                        newBean = list.stream().skip(1).findFirst().map(JSON::parse).orElse(null);
-                    }
-                }
-                List<FieldInfo> diffField = Equator.getDiffField(oldBean, newBean);
-                easyLogInfo.setFieldInfoList(diffField);
-            }
+            easyLogInfo.setFieldInfoList(getFieldInfoList(easyLogInfo.getDetail()));
             easyLogInfos.add(easyLogInfo);
         }
         if (!CollectionUtils.isEmpty(easyLogInfoList)) {
@@ -282,30 +262,38 @@ public class EasyLogAspect {
                 logInfo.setPlatform(platform);
                 String operator = templateMap.getOrDefault(logInfo.getOperator(), operatorService.getOperator());
                 logInfo.setOperator(operator);
-                if (StringUtils.isNotBlank(logInfo.getDetail())) {
-                    Object o = null;
-                    try {
-                        o = JSON.parse(logInfo.getDetail());
-                    } catch (Exception e) {
-                        log.info("反序列化失败 easyLogInfo.getDetail()=" + logInfo.getDetail(), e);
-                    }
-                    Object oldBean = null;
-                    //默认为新增
-                    Object newBean = o;
-                    if (o instanceof JSONArray) {
-                        List<String> list = JSON.parseArray(logInfo.getDetail(), String.class);
-                        if (!CollectionUtils.isEmpty(list)) {
-                            oldBean = list.stream().findFirst().map(JSON::parse).orElse(null);
-                            newBean = list.stream().skip(1).findFirst().map(JSON::parse).orElse(null);
-                        }
-                    }
-                    List<FieldInfo> diffField = Equator.getDiffField(oldBean, newBean);
-                    logInfo.setFieldInfoList(diffField);
-                }
+                logInfo.setFieldInfoList(getFieldInfoList(logInfo.getDetail()));
                 easyLogInfos.add(logInfo);
             });
         }
         return easyLogInfos;
+    }
+
+    private List<FieldInfo> getFieldInfoList(String detail) {
+        Object o;
+        try {
+            o = JSON.parse(detail);
+        } catch (Exception e) {
+            log.info("反序列化失败 detail=" + detail, e);
+            FieldInfo fieldDiff = new FieldInfo();
+            fieldDiff.setNewFieldVal(detail);
+            return Collections.singletonList(fieldDiff);
+        }
+        String oldBean = null;
+        //默认为新增
+        String newBean = detail;
+        if (o instanceof JSONArray) {
+            List<String> list = JSON.parseArray(detail, String.class);
+            if (!CollectionUtils.isEmpty(list)) {
+                oldBean = list.stream().findFirst().orElse(null);
+                newBean = list.stream().skip(1).findFirst().orElse(null);
+            }
+        } else {
+            FieldInfo fieldDiff = new FieldInfo();
+            fieldDiff.setNewFieldVal(detail);
+            return Collections.singletonList(fieldDiff);
+        }
+        return Equator.getDiffField(oldBean, newBean);
     }
 
 }

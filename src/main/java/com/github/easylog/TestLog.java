@@ -22,7 +22,17 @@ public class TestLog {
             @EasyLog(module = "用户管理", type = OperateType.READ, success = "测试多个日志-2： {getBeforeRealNameByName{#name}}")
     })
     public void manyLog(String name) {
-        EasyLogUtil.record(name, "1", "1", "1", new String[]{"1", "2"});
+        UserEntity old = new UserEntity();
+        old.setId(1L);
+        old.setName("AAAA");
+        UserEntity ne = new UserEntity();
+        ne.setId(2L);
+        ne.setName("BBBB");
+        EasyLogUtil.record(name, "1", "1","CCC","DDD");
+        EasyLogUtil.record(name, "1", "1","EEEE");
+
+        EasyLogUtil.record(name, "1", "1", old,ne);
+        EasyLogUtil.record(name, "1", "1", ne);
 
     }
 
