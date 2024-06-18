@@ -266,10 +266,6 @@ public class EasyLogAspect {
                     String operator = templateMap.getOrDefault(logInfo.getOperator(), operatorService.getOperator());
                     logInfo.setOperator(operator);
                 }
-                String platform = templateMap.getOrDefault(logInfo.getPlatform(), operatorService.getPlatform());
-                logInfo.setPlatform(platform);
-                String operator = templateMap.getOrDefault(logInfo.getOperator(), operatorService.getOperator());
-                logInfo.setOperator(operator);
                 logInfo.setFieldInfoList(getFieldInfoList(logInfo.getDetail()));
                 easyLogInfos.add(logInfo);
             });
