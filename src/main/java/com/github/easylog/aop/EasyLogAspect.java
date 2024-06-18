@@ -14,6 +14,7 @@ import com.github.easylog.service.IOperatorService;
 import com.github.easylog.service.OpLogContext;
 import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -232,7 +233,6 @@ public class EasyLogAspect {
         for (EasyLogOps easyLogOps : easyLogOpsList) {
             EasyLogInfo easyLogInfo = new EasyLogInfo();
             easyLogInfo.setCondition(templateMap.get(easyLogOps.getCondition()));
-
             String platform = templateMap.getOrDefault(easyLogOps.getPlatform(), operatorService.getPlatform());
             easyLogInfo.setPlatform(platform);
             String operator = templateMap.getOrDefault(easyLogOps.getOperator(), operatorService.getOperator());
@@ -258,6 +258,14 @@ public class EasyLogAspect {
         }
         if (!CollectionUtils.isEmpty(easyLogInfoList)) {
             easyLogInfoList.forEach(logInfo -> {
+                if (StringUtils.isBlank(logInfo.getPlatform())) {
+                    String platform = templateMap.getOrDefault(logInfo.getPlatform(), operatorService.getPlatform());
+                    logInfo.setPlatform(platform);
+                }
+                if (StringUtils.isBlank(logInfo.getOperator())) {
+                    String operator = templateMap.getOrDefault(logInfo.getOperator(), operatorService.getOperator());
+                    logInfo.setOperator(operator);
+                }
                 String platform = templateMap.getOrDefault(logInfo.getPlatform(), operatorService.getPlatform());
                 logInfo.setPlatform(platform);
                 String operator = templateMap.getOrDefault(logInfo.getOperator(), operatorService.getOperator());

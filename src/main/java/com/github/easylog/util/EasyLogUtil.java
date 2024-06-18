@@ -26,6 +26,17 @@ public class EasyLogUtil {
         record(easyLogInfo);
     }
 
+    public static void record(String operator, String bizNo, String module, String type, String content, String[] contentParam) {
+        EasyLogInfo easyLogInfo = new EasyLogInfo();
+        easyLogInfo.setOperator(operator);
+        easyLogInfo.setBizNo(bizNo);
+        easyLogInfo.setModule(module);
+        easyLogInfo.setType(type);
+        easyLogInfo.setContent(content);
+        easyLogInfo.setContentParam(contentParam);
+        record(easyLogInfo);
+    }
+
     public static void record(List<EasyLogInfo> list) {
         OpLogContext.peekAndAddLogStack(list);
     }
@@ -34,15 +45,15 @@ public class EasyLogUtil {
         record(Collections.singletonList(o));
     }
 
-    public static void record(String bizNo, String module, String type, String content, String[] contentParam, Object oldBean, Object newBean) {
+    public static void record(String operator,String bizNo, String module, String type, String content, String[] contentParam, Object oldBean, Object newBean) {
         EasyLogInfo easyLogInfo = new EasyLogInfo();
+        easyLogInfo.setOperator(operator);
         easyLogInfo.setBizNo(bizNo);
         easyLogInfo.setModule(module);
         easyLogInfo.setType(type);
         easyLogInfo.setContent(content);
         easyLogInfo.setContentParam(contentParam);
         easyLogInfo.setDetail(JSON.toJSONString(Lists.newArrayList(oldBean, newBean)));
-
         record(easyLogInfo);
     }
 
