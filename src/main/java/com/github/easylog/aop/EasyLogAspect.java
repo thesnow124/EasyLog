@@ -121,6 +121,7 @@ public class EasyLogAspect {
             executeResult.calcExecuteTime(result);
         } catch (Throwable e) {
             executeResult.exception(e);
+            throw e;
         } finally {
             easyLogInfoList = OpLogContext.popLogStack();
             Stack<List<EasyLogInfo>> logStack = OpLogContext.getLogStack();
