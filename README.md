@@ -5,8 +5,7 @@
 **核心能力**
 - 操作日志：成功/失败模板、参数占位符、条件记录
 - 详情变更：支持 JSON 字段差异比对（新增/修改/删除）
-- 表达式解析：SpEL、方法参数、方法返回值/异常信息
-- 自定义函数：支持前置/环绕函数，拼装更灵活的内容
+- 表达式解析：SpEL（支持调用 Spring Bean 方法）、方法参数、方法返回值/异常信息
 - 最小依赖：作为 SDK 使用，尽量减少对业务的传递依赖
 
 参考文章：https://tech.meituan.com/2021/09/16/operational-logbook.html
@@ -48,7 +47,7 @@
 
 ```properties
 easylog.enable=true       # 是否启用（默认 true）
-easylog.banner=false      # 是否打印 banner（默认 true）
+easylog.store=log         # 落地方式：log | jdbc（默认 log）
 ```
 
 2) 提供操作者/平台信息（推荐）：实现 `IOperatorService` 覆盖默认实现
@@ -91,23 +90,19 @@ public User update(UserDto userDto) { ... }
 @EasyLogs({
   @EasyLog(module = "用户管理", type = "UPDATE",
            success = "测试多个日志-1： ${} 这是后缀${}",
-           successParamList = {"{getBeforeName{#name}}"}),
+           successParamList = {"{{ @easyLogFunctions.getBeforeName(#p0) }}"}),
   @EasyLog(module = "用户管理", type = "READ",
-           success = "测试多个日志-2： {getBeforeName{#name}}")
+           success = "测试多个日志-2： {{ @easyLogFunctions.getBeforeName(#p0) }}")
 })
 public void manyLog(String name) { ... }
 ```
 
 ## 模板与表达式说明
 - 直接嵌入（SpEL）：`{{...}}`
-  - 方法参数：`{{#userDto.name}}`
+  - 方法参数：`{{#userDto.name}}`，或 `{{#p0}}`/`{{#a0}}`
   - 返回结果：`{{#_result}}`
   - 异常信息：`{{#_errMsg}}`
-  - 支持 `@beanName.method(...)` 形式（SpEL 调用 Bean 方法）
-
-- 自定义函数：`{functionName{SpEL}}`
-  - 例如：`{getBeforeName{#name}}`
-  - 扩展点：实现 `ICustomFunction`，可声明 `executeBefore()` 与 `executeAround()`（前置/环绕执行）
+  - 调用 Bean 方法：`{{ @beanName.method(...) }}`（以 Bean 函数替代自定义 DSL）
 
 - 内容占位符：`${}`
   - 用于 `success`/`fail` 文本中顺序占位；对应参数从 `successParamList`/`failParamList` 解析后按顺序替换
@@ -117,15 +112,38 @@ public void manyLog(String name) { ... }
   - 若 `detail` 为 JSON 数组字符串 `[oldJson, newJson]`，将自动计算差异字段列表
   - 若为普通字符串或 JSON 对象，将按原样记录
 
+## 用法清单与示例
+- SpEL 基础：
+  - `{{ #p0 }}` / `{{ #userDto.name }}` / `{{ #_result }}` / `{{ #_errMsg }}`
+- 调用 Bean 方法：
+  - `{{ @easyLogFunctions.userLabel(#p0) }}`
+  - 旧值（前置执行）：`{{ @easyLogFunctions.loadOldJson(#id) }}`
+  - 新值（后置执行，依赖结果）：`{{ @easyLogFunctions.buildNew(#_result) }}`
+- 后置执行标记（不依赖结果也要后置执行）：
+  - `{{ @easyLogPhase.after(@easyLogFunctions.loadNew(#id)) }}`
+- 变量上下文（在方法内设置临时变量供模板使用）：
+  - 代码：`EasyLogContext.put("oldAddress", oldAddress);`
+  - 模板：`"从 {{#oldAddress}} 改为 {{#_result.address}}"`
+- 失败日志：
+  - `fail = "操作失败：{{#_errMsg}}"`
+- 详情差异：
+  - `detail = "[{{ @easyLogFunctions.loadOldJson(#id) }}, {{ #_result }}]"`
+- 条件记录：
+  - `condition = "{{ #p0 != null }}"`
+- 文本占位与顺序参数：
+  - `success = "用户：${} 被禁用，原因：${}"`
+  - `successParamList = {"{{ #user.name }}", "{{ #reason }}"}`
+
 ## 自动装配与覆盖
 本 SDK 提供自动装配：
 - `EasyLogAutoConfiguration` 受 `easylog.enable` 控制（默认开启）
 - 若业务侧提供同名 Bean，则自动替换默认实现：
   - `IOperatorService`（操作者/平台）
-  - `ILogRecordService`（日志落地）
-  - `ICustomFunction`（自定义函数，按名称注册）
+  - `ILogRecordService`（日志落地），并可通过 `easylog.store=jdbc|log` 切换默认实现
 
-## 迁移说明（2.x → 3.x）
+## 迁移说明
+- 自定义函数 DSL 删除：原 `{funcName{SpEL}}` 改为 `{{ @beanName.method(SpEL) }}`
+- Java 17+ 与 Spring Boot 3.x（Jakarta）
 - Java 17+ 与 Spring Boot 3.x（Jakarta）
 - 包名迁移：`javax.*` → `jakarta.*`
   - 例如：`javax.annotation.PostConstruct` → `jakarta.annotation.PostConstruct`
@@ -141,8 +159,7 @@ chmod +x mvnw
 ./mvnw clean test
 ```
 
-## 数据库存储（可选）
-- 若业务引入了 `DataSource` 且未自定义 `ILogRecordService`，SDK 将自动启用 JDBC 版落库实现。
+- 设定 `easylog.store=jdbc` 且业务引入了 `DataSource` 时启用 JDBC 版落库实现；否则默认打印日志。
 - 建表脚本见：`docs/sql/easy_log_record.sql`
 - 若需自定义存储（DB/ES/MQ），实现并注入 `ILogRecordService` 即可覆盖默认行为。
 

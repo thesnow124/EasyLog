@@ -14,8 +14,8 @@ import org.springframework.stereotype.Service;
 public class TestLog {
 
     @EasyLogs({
-            @EasyLog(module = "用户管理", type = OperateType.UPDATE, success = "测试多个日志-1： ${} 这是后缀${}",successParamList = {"{getBeforeRealNameByName{#name}}"}),
-            @EasyLog(module = "用户管理", type = OperateType.READ, success = "测试多个日志-2： {getBeforeRealNameByName{#name}}")
+            @EasyLog(module = "用户管理", type = OperateType.UPDATE, success = "测试多个日志-1： ${} 这是后缀${}",successParamList = {"{{@easyLogFunctions.getBeforeRealNameByName(#p0)}}"}),
+            @EasyLog(module = "用户管理", type = OperateType.READ, success = "测试多个日志-2： {{@easyLogFunctions.getBeforeRealNameByName(#p0)}}")
     })
     public void manyLog(String name) {
         UserEntity old = new UserEntity();

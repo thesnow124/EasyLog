@@ -25,8 +25,8 @@ public class EasyLogProperties {
     private String platform;
 
     /**
-     * 是否在控制台打印 banner，默认打印
+     * 日志落地方式：log | jdbc，默认 log
      */
-    private boolean banner = true;
+    private String store = "log";
 
 }

@@ -91,13 +91,6 @@
             <version>1.18.30</version>
             <scope>provided</scope>
         </dependency>
-        <!-- IDE 配置提示（编译期注解处理器，不会传递到下游） -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-configuration-processor</artifactId>
-            <optional>true</optional>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/com.alibaba/fastjson -->
         <dependency>
             <groupId>com.alibaba</groupId>
             <artifactId>fastjson</artifactId>

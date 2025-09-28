@@ -35,26 +35,23 @@ easy-log 选择 AOP 注解方式，在方法调用维度收集上下文并拼装
 - 操作日志 vs 系统日志：面向阅读者不同，easy-log 聚焦“用户可读”的操作内容。
 - AOP 注解：用切面统一采集方法上下文，拼装日志实体并输出/持久化。
 - 模板语法：
-  - SpEL：`{{ <SpEL> }}`，示例 `{{#userDto.name}}`、`{{#_result}}`、`{{#_errMsg}}`。
-  - 自定义函数：`{ funcName{ <SpEL> }}`，示例 `{getBeforeName{#name}}`。
+  - SpEL：`{{ <SpEL> }}`，示例 `{{#userDto.name}}`、`{{#_result}}`、`{{#_errMsg}}`、`{{@bean.method(#arg)}}`。
   - 文本占位符：`success`/`fail` 模板中 `${}` 顺序占位，对应 `successParamList`/`failParamList` 的解析结果（按顺序替换）。
-- 上下文栈：方法嵌套时使用 `ThreadLocal<Stack<List<EasyLogInfo>>>` 保证日志隔离与顺序。
+- 上下文：`EasyLogContext`（ThreadLocal 变量上下文，模板里 `{{#key}}` 可直接取值）。
 
 ### 5.2 模块划分（现有实现）
 - 注解：`@EasyLog`、`@EasyLogs`
-- 切面：`EasyLogAspect`（切点、前置函数解析、执行/异常捕获、后置模板渲染与落地）
+- 切面：`EasyLogAspect`（切点、执行/异常捕获、模板渲染与落地）
 - 表达式解析：`EasyLogCachedExpressionEvaluator`、`EasyLogEvaluationContext`、`EasyLogParser`
-- 自定义函数：`ICustomFunction`、`IFunctionService`、`CustomFunctionFactory`、默认实现
 - 自动装配：`EasyLogAutoConfiguration`、`EasyLogProperties`
-- 上下文：`OpLogContext`
 - 输出与扩展：`ILogRecordService`（默认打印）与 `IOperatorService`（默认空）
 - 工具与模型：`PlaceholderResolver`、`EasyLogInfo`、`FieldInfo` 等
 
 ### 5.3 关键时序
-1) 解析注解参数 → 收集模板键集合 → 执行“前置函数”（自定义函数 executeBefore）
+1) 解析注解参数 → 收集模板键集合 → 预解析不依赖 `#_result/#_errMsg` 的 SpEL（前置快照）
 2) 执行业务方法（记录成功/异常/耗时）
-3) 渲染模板（SpEL 与函数）→ 生成 `EasyLogInfo` 列表 → 调用 `ILogRecordService.record`
-4) 嵌套调用时使用 `OpLogContext` 栈式管理，完成后清理上下文
+3) 渲染模板（SpEL；依赖 `#_result/#_errMsg` 的在后置求值，前置值复用）→ 生成 `EasyLogInfo` 列表 → 调用 `ILogRecordService.record`
+4) 嵌套与变量上下文：通过 `EasyLogContext` push/pop 管理，完成后清理
 
 ## 6. 公共 API 与注解
 ### 6.1 注解参数（`@EasyLog`）
@@ -63,15 +60,14 @@ easy-log 选择 AOP 注解方式，在方法调用维度收集上下文并拼装
 - `module`: 模块名
 - `type`: 操作类型（如 CREATE/UPDATE/DELETE/READ）
 - `bizNo`: 业务对象标识（如订单号、用户ID）
-- `success` / `fail`: 成功/失败模板（支持 `{{}}`、`{func{}}`、`${}`）
+- `success` / `fail`: 成功/失败模板（支持 `{{}}`、`${}`）
 - `successParamList` / `failParamList`: 文本 `${}` 的顺序参数键（模板解析后按顺序替换）
 - `detail`: 详情字符串；若为 JSON 数组字符串 `[oldJson, newJson]` 会生成字段差异
 - `condition`: 记录条件（SpEL），为空视为记录
 
 ### 6.2 模板与表达式
 - SpEL：`{{#param.path}}`、`{{#_result}}`、`{{#_errMsg}}`、`{{@bean.method(#args)}}`
-- 函数：`{funcName{#param}}`，支持前置/环绕（参见 ICustomFunction）
-- 文本占位：`用户：${} 已被禁用，原因：${}` → `successParamList = {"{#user.name}","{#reason}"}`
+- 文本占位：`用户：${} 已被禁用，原因：${}` → `successParamList = {"{{#user.name}}","{{#reason}}"}`
 
 ### 6.3 示例
 ```
@@ -87,9 +83,9 @@ public User update(UserDto userDto) { ... }
 @EasyLogs({
   @EasyLog(module="用户管理", type="UPDATE",
            success="测试多个日志-1： ${} 这是后缀${}",
-           successParamList={"{getBeforeName{#name}}"}),
+           successParamList={"{{ @easyLogFunctions.getBeforeName(#p0) }}"}),
   @EasyLog(module="用户管理", type="READ",
-           success="测试多个日志-2： {getBeforeName{#name}}")
+           success="测试多个日志-2： {{ @easyLogFunctions.getBeforeName(#p0) }}")
 })
 public void manyLog(String name) { ... }
 ```
@@ -97,8 +93,6 @@ public void manyLog(String name) { ... }
 ## 7. 扩展点
 - `IOperatorService`：提供 `getOperator()` 与 `getPlatform()`，用于默认取值
 - `ILogRecordService`：输出/持久化日志（文件、DB、ES、MQ 均可）
-- `ICustomFunction`：自定义函数，支持 `executeBefore()` 与 `executeAround()` 与 `apply()`
-- `CustomFunctionFactory`：按函数名注册检索函数实现
 
 ## 8. 运行时行为与边界
 - 嵌套方法：使用 `ThreadLocal<Stack<...>>` 隔离日志，避免覆盖/污染
@@ -111,8 +105,8 @@ public void manyLog(String name) { ... }
 
 ## 9. 依赖与兼容性
 - 运行环境：Java 17+，Spring Boot 3.x（Jakarta 命名空间）
-- 最小依赖策略：
-  - 必需：`spring-boot-autoconfigure`、`spring-aop`、`aspectjrt`、`aspectjweaver`(runtime)、`commons-lang3`、`guava`、`fastjson`、`json-diff*`
+  - 最小依赖策略：
+  - 必需：`spring-boot-autoconfigure`、`spring-aop`、`aspectjrt`、`aspectjweaver`(runtime)、`commons-lang3`、`guava`、`fastjson`、`javers-core`
   - 可选/不传递：`spring-web`（请求上下文）、`jakarta.servlet-api`（provided）、`slf4j-api`
   - 编译期：`lombok`（provided）
 - 不兼容 Boot 2.x（`javax.*` → `jakarta.*` 已整体迁移）
@@ -132,7 +126,7 @@ public void manyLog(String name) { ... }
 
 ## 12. 配置项（`EasyLogProperties`）
 - `easylog.enable`：是否开启（默认 true）
-- `easylog.banner`：是否打印 banner（默认 true）
+- `easylog.store`：日志落地方式：`log` | `jdbc`（默认 `log`）
 - `platform`：默认从 `spring.application.name` 注入；可由 `IOperatorService` 覆盖
 
 ## 13. 测试与质量
@@ -156,10 +150,10 @@ public void manyLog(String name) { ... }
   - 上下文跨线程传递的可选支持（TTL 集成）
   - 更丰富的埋点注解与链路聚合能力（保持轻量）
 
-## 15. 迁移指南（Boot 2 → 3）
+## 15. 迁移指南
+- 自定义函数 DSL 删除：`{funcName{SpEL}}` → `{{ @beanName.method(SpEL) }}`
 - 导入包迁移：`javax.*` → `jakarta.*`（如 `PostConstruct`、`HttpServletRequest`）
 - 运行环境：JDK 17+
-- 依赖管理：删除旧版 starter 显式版本声明，使用 Boot 3 BOM 对齐
 
 ## 16. FAQ（节选）
 - Q：非 Web 项目能用吗？
@@ -172,4 +166,3 @@ public void manyLog(String name) { ... }
 ---
 
 附：灵感来源文章《如何优雅地记录操作日志》强调“与业务解耦、模板化、可读可配”，easy-log 的设计与实现沿着该思路，结合 Spring AOP 与 SpEL、自定义函数、上下文栈与最小依赖策略落地，适配 Boot 3 / Java 17 生态。
-
