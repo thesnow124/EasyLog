@@ -29,4 +29,10 @@ public class EasyLogProperties {
      */
     private String store = "log";
 
+    /**
+     * 是否在事务提交后再落地日志（存在事务时有效）。
+     * 默认为 false（方法结束即记录）。
+     */
+    private boolean afterCommit = false;
+
 }

@@ -36,8 +36,4 @@ public class EasyLogCachedExpressionEvaluator extends CachedExpressionEvaluator 
     public Object parseExpression(String expression, AnnotatedElementKey methodKey, EvaluationContext evalContext) {
         return this.getExpression(this.keyCache, methodKey, expression).getValue(evalContext);
     }
-
-    void clear() {
-        this.keyCache.clear();
-    }
 }

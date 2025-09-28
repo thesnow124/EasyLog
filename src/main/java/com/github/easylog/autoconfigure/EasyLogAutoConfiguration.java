@@ -76,6 +76,6 @@ public class EasyLogAutoConfiguration {
     public EasyLogAspect easyLogAspect(ILogRecordService logRecordService,
                                        IOperatorService operatorService,
                                        EasyLogParser easyLogParser) {
-        return new EasyLogAspect(logRecordService, operatorService, easyLogParser);
+        return new EasyLogAspect(logRecordService, operatorService, easyLogParser, easyLogProperties.isAfterCommit());
     }
 }

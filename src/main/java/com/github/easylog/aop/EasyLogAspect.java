@@ -1,7 +1,7 @@
 package com.github.easylog.aop;
 
-import com.alibaba.fastjson.JSON;
-import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.compare.Equator;
 import com.github.easylog.compare.FieldInfo;
@@ -12,7 +12,6 @@ import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
 import com.github.easylog.api.ILogRecordService;
 import com.github.easylog.api.IOperatorService;
-import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.exception.ExceptionUtils;
@@ -48,10 +47,13 @@ public class EasyLogAspect {
 
     private final EasyLogParser easyLogParser;
 
-    public EasyLogAspect(ILogRecordService logRecordService, IOperatorService operatorService, EasyLogParser easyLogParser) {
+    private final boolean afterCommit;
+
+    public EasyLogAspect(ILogRecordService logRecordService, IOperatorService operatorService, EasyLogParser easyLogParser, boolean afterCommit) {
         this.logRecordService = logRecordService;
         this.operatorService = operatorService;
         this.easyLogParser = easyLogParser;
+        this.afterCommit = afterCommit;
     }
 
     /**
@@ -81,10 +83,10 @@ public class EasyLogAspect {
         Map<String, String> customFunctionExecResultMap = new HashMap<>();
         List<EasyLogOps> easyLogOpsList = new ArrayList<>();
         try {
+            List<EasyLogOps> ops = new ArrayList<>();
             EasyLog[] logList = method.getAnnotationsByType(EasyLog.class);
-            easyLogOpsList = Arrays.stream(logList)
-                    .map(this::parseLogAnnotation)
-                    .collect(Collectors.toList());
+            ops.addAll(Arrays.stream(logList).map(this::parseLogAnnotation).collect(Collectors.toList()));
+            easyLogOpsList = ops;
             expressTemplateList = getExpressTemplate(easyLogOpsList);
             customFunctionExecResultMap = easyLogParser.processBeforeExec(expressTemplateList, method, args, targetClass);
         } catch (Exception e) {
@@ -142,8 +144,9 @@ public class EasyLogAspect {
                 easyLogInfo.setHttpMethod(executeResult.getHttpMethod());
                 easyLogInfo.setClassMethod(executeResult.getClassMethod());
                 easyLogInfo.setParam(executeResult.getParam());
-                logRecordService.record(easyLogInfo);
             });
+            // record now or after-commit
+            recordLogs(easyLogInfos);
         } catch (Exception e) {
             log.info("方法后逻辑发生异常", e);
         }
@@ -152,6 +155,25 @@ public class EasyLogAspect {
             throw executeResult.getThrowable();
         }
         return executeResult.getResult();
+    }
+
+    private void recordLogs(List<EasyLogInfo> logs) {
+        if (logs == null || logs.isEmpty()) return;
+        if (afterCommit && org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        public void afterCommit() {
+                            for (EasyLogInfo logInfo : logs) {
+                                try { logRecordService.record(logInfo); } catch (Exception ignore) {}
+                            }
+                        }
+                    }
+            );
+        } else {
+            for (EasyLogInfo logInfo : logs) {
+                try { logRecordService.record(logInfo); } catch (Exception ignore) {}
+            }
+        }
     }
 
 
@@ -225,9 +247,15 @@ public class EasyLogAspect {
     private List<String> getExpressTemplate(List<EasyLogOps> easyLogOpsList) {
         Set<String> set = new HashSet<>();
         for (EasyLogOps easyLogOps : easyLogOpsList) {
-            set.addAll(Lists.newArrayList(easyLogOps.getBizNo(), easyLogOps.getDetails(),
-                    easyLogOps.getOperator(), easyLogOps.getPlatform(), easyLogOps.getSuccess(), easyLogOps.getFail(),
-                    easyLogOps.getCondition()));
+            set.addAll(java.util.Arrays.asList(
+                    easyLogOps.getBizNo(),
+                    easyLogOps.getDetails(),
+                    easyLogOps.getOperator(),
+                    easyLogOps.getPlatform(),
+                    easyLogOps.getSuccess(),
+                    easyLogOps.getFail(),
+                    easyLogOps.getCondition()
+            ));
             set.addAll(Arrays.asList(easyLogOps.getSuccessParamList()));
             set.addAll(Arrays.asList(easyLogOps.getFailParamList()));
         }

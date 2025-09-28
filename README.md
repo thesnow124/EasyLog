@@ -48,6 +48,7 @@
 ```properties
 easylog.enable=true       # 是否启用（默认 true）
 easylog.store=log         # 落地方式：log | jdbc（默认 log）
+easylog.after-commit=false # 是否在事务提交后再落地（默认 false）
 ```
 
 2) 提供操作者/平台信息（推荐）：实现 `IOperatorService` 覆盖默认实现

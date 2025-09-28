@@ -127,6 +127,7 @@ public void manyLog(String name) { ... }
 ## 12. 配置项（`EasyLogProperties`）
 - `easylog.enable`：是否开启（默认 true）
 - `easylog.store`：日志落地方式：`log` | `jdbc`（默认 `log`）
+- `easylog.after-commit`：是否在事务提交后再落地（默认 false；存在事务时有效）
 - `platform`：默认从 `spring.application.name` 注入；可由 `IOperatorService` 覆盖
 
 ## 13. 测试与质量
