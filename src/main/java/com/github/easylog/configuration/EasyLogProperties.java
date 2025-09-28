@@ -4,7 +4,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.stereotype.Component;
 
 
 /**
@@ -13,7 +12,6 @@ import org.springframework.stereotype.Component;
 @Setter
 @Getter
 @ConfigurationProperties(prefix = "easylog")
-@Component
 public class EasyLogProperties {
     /**
      * 是否开启操作日志，默认开启

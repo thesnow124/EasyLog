@@ -12,29 +12,14 @@ import java.util.Map;
  */
 public class CustomFunctionFactory {
 
-    private static final Map<String, ICustomFunction> customFunctionMap = new HashMap<>();
-
-//    public CustomFunctionFactory() {
-//        this.register();
-//    }
+    private final Map<String, ICustomFunction> customFunctionMap = new HashMap<>();
 
     public CustomFunctionFactory(List<ICustomFunction> customFunctions) {
-        for (ICustomFunction customFunction : customFunctions) {
-            customFunctionMap.put(customFunction.functionName(), customFunction);
+        if (!CollectionUtils.isEmpty(customFunctions)) {
+            for (ICustomFunction customFunction : customFunctions) {
+                customFunctionMap.put(customFunction.functionName(), customFunction);
+            }
         }
-    }
-
-    /**
-     * 从spring容器中获取实现 {@link ICustomFunction} 接口的类
-     */
-    private void register() {
-        Map<String, ICustomFunction> beansOfType = ApplicationContextHolder.getInstance().getBeansOfType(ICustomFunction.class);
-        if (CollectionUtils.isEmpty(beansOfType)) {
-            return;
-        }
-        beansOfType.values().forEach(iCustomFunction -> {
-            customFunctionMap.put(iCustomFunction.functionName(), iCustomFunction);
-        });
     }
 
     /**

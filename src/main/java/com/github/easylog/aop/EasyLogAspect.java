@@ -5,13 +5,13 @@ import com.alibaba.fastjson.JSONArray;
 import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.compare.Equator;
 import com.github.easylog.compare.FieldInfo;
+import com.github.easylog.context.EasyLogContext;
 import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
-import com.github.easylog.service.OpLogContext;
 import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -29,7 +29,7 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -38,16 +38,15 @@ import java.util.stream.Collectors;
  * @author Gaosl
  */
 @Aspect
-@Component
 @Slf4j
 public class EasyLogAspect {
 
 
-    private ILogRecordService logRecordService;
+    private final ILogRecordService logRecordService;
 
-    private IOperatorService operatorService;
+    private final IOperatorService operatorService;
 
-    private EasyLogParser easyLogParser;
+    private final EasyLogParser easyLogParser;
 
     public EasyLogAspect(ILogRecordService logRecordService, IOperatorService operatorService, EasyLogParser easyLogParser) {
         this.logRecordService = logRecordService;
@@ -100,7 +99,7 @@ public class EasyLogAspect {
             ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             if (Objects.nonNull(attributes)) {
                 HttpServletRequest request = attributes.getRequest();
-                executeResult.setIp(request.getRemoteAddr());
+                executeResult.setIp(extractClientIp(request));
                 executeResult.setUrl(String.valueOf(request.getRequestURL()));
                 executeResult.setHttpMethod(request.getMethod());
             }
@@ -112,27 +111,23 @@ public class EasyLogAspect {
             log.info("解析通用信息发生异常", e);
         }
 
-        List<EasyLogInfo> easyLogInfoList;
         //方法逻辑
         try {
-            OpLogContext.pushLogStack(new ArrayList<>());
+             EasyLogContext.push();
             Object result;
             result = joinPoint.proceed();
             executeResult.calcExecuteTime(result);
         } catch (Throwable e) {
             executeResult.exception(e);
         } finally {
-            easyLogInfoList = OpLogContext.popLogStack();
-            Stack<List<EasyLogInfo>> logStack = OpLogContext.getLogStack();
-            if (CollectionUtils.isEmpty(logStack)) {
-                OpLogContext.removeLogStack();
-            }
+             EasyLogContext.pop();
+             EasyLogContext.clearIfEmpty();
         }
 
         //方法后逻辑
         try {
             Map<String, String> templateMap = easyLogParser.processAfterExec(expressTemplateList, customFunctionExecResultMap, method, args, targetClass, executeResult.getErrMsg(), executeResult.getResult());
-            List<EasyLogInfo> easyLogInfos = createEasyLogInfo(templateMap, easyLogOpsList, executeResult, easyLogInfoList);
+            List<EasyLogInfo> easyLogInfos = createEasyLogInfo(templateMap, easyLogOpsList, executeResult);
             easyLogInfos.forEach(easyLogInfo -> {
                 easyLogInfo.setResult(JSON.toJSONString(executeResult.getResult()));
                 easyLogInfo.setSuccess(executeResult.isSuccess());
@@ -162,8 +157,12 @@ public class EasyLogAspect {
 
     private Map<String, Object> buildRequestParam(String[] paramNames, Object[] paramValues) {
         Map<String, Object> requestParams = new HashMap<>(16);
+        if (paramNames == null) {
+            paramNames = new String[paramValues == null ? 0 : paramValues.length];
+            for (int i = 0; i < paramNames.length; i++) paramNames[i] = "arg" + i;
+        }
         for (int i = 0; i < paramNames.length; i++) {
-            Object value = paramValues[i];
+            Object value = i < paramValues.length ? paramValues[i] : null;
             //如果是文件对象
             if (value instanceof MultipartFile) {
                 MultipartFile file = (MultipartFile) value;
@@ -176,6 +175,23 @@ public class EasyLogAspect {
             requestParams.put(paramNames[i], value);
         }
         return requestParams;
+    }
+
+    private String extractClientIp(HttpServletRequest request) {
+        try {
+            String xff = request.getHeader("X-Forwarded-For");
+            if (!ObjectUtils.isEmpty(xff)) {
+                // take first non-empty part
+                String[] parts = xff.split(",");
+                for (String p : parts) {
+                    String ip = p.trim();
+                    if (!ip.isEmpty()) return ip;
+                }
+            }
+            String real = request.getHeader("X-Real-IP");
+            if (!ObjectUtils.isEmpty(real)) return real;
+        } catch (Exception ignored) {}
+        return request.getRemoteAddr();
     }
 
     /**
@@ -228,11 +244,21 @@ public class EasyLogAspect {
      * @param easyLogOpsList easyLogOpsList
      * @return List<EasyLogInfo>
      */
-    private List<EasyLogInfo> createEasyLogInfo(Map<String, String> templateMap, List<EasyLogOps> easyLogOpsList, MethodExecuteResult executeResult, List<EasyLogInfo> easyLogInfoList) {
+    private List<EasyLogInfo> createEasyLogInfo(Map<String, String> templateMap, List<EasyLogOps> easyLogOpsList, MethodExecuteResult executeResult) {
         List<EasyLogInfo> easyLogInfos = new ArrayList<>();
         for (EasyLogOps easyLogOps : easyLogOpsList) {
+            // condition: default true
+            boolean shouldRecord = true;
+            String conditionKey = easyLogOps.getCondition();
+            if (!ObjectUtils.isEmpty(conditionKey)) {
+                String condVal = templateMap.get(conditionKey);
+                shouldRecord = Boolean.parseBoolean(String.valueOf(condVal));
+            }
+            if (!shouldRecord) {
+                continue;
+            }
             EasyLogInfo easyLogInfo = new EasyLogInfo();
-            easyLogInfo.setCondition(templateMap.get(easyLogOps.getCondition()));
+            easyLogInfo.setCondition(ObjectUtils.isEmpty(conditionKey) ? "true" : templateMap.get(conditionKey));
             String platform = templateMap.getOrDefault(easyLogOps.getPlatform(), operatorService.getPlatform());
             easyLogInfo.setPlatform(platform);
             String operator = templateMap.getOrDefault(easyLogOps.getOperator(), operatorService.getOperator());
@@ -250,25 +276,14 @@ public class EasyLogAspect {
             }
             easyLogInfo.setContent(templateMap.get(contentKey));
             String[] array = Arrays.stream(paramKeyList)
-                    .map(templateMap::get)
+                    .map(k -> {
+                        String v = templateMap.get(k);
+                        return v == null ? "" : v;
+                    })
                     .toArray(String[]::new);
             easyLogInfo.setContentParam(array);
             easyLogInfo.setFieldInfoList(getFieldInfoList(easyLogInfo.getDetail()));
             easyLogInfos.add(easyLogInfo);
-        }
-        if (!CollectionUtils.isEmpty(easyLogInfoList)) {
-            easyLogInfoList.forEach(logInfo -> {
-                if (StringUtils.isBlank(logInfo.getPlatform())) {
-                    String platform = templateMap.getOrDefault(logInfo.getPlatform(), operatorService.getPlatform());
-                    logInfo.setPlatform(platform);
-                }
-                if (StringUtils.isBlank(logInfo.getOperator())) {
-                    String operator = templateMap.getOrDefault(logInfo.getOperator(), operatorService.getOperator());
-                    logInfo.setOperator(operator);
-                }
-                logInfo.setFieldInfoList(getFieldInfoList(logInfo.getDetail()));
-                easyLogInfos.add(logInfo);
-            });
         }
         return easyLogInfos;
     }

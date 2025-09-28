@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>2.5.15</version>
+        <version>3.3.0</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
 
@@ -19,10 +19,7 @@
     <description>easy-log</description>
 
     <properties>
-        <maven.compiler.source>8</maven.compiler.source>
-        <maven.compiler.target>8</maven.compiler.target>
-        <spring-boot.version>2.5.15</spring-boot.version>
-        <java.version>1.8</java.version>
+        <java.version>17</java.version>
         <guava.version>32.0.0-jre</guava.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -30,24 +27,50 @@
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-aop</artifactId>
-            <version>${spring-boot.version}</version>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-autoconfigure</artifactId>
-            <version>${spring-boot.version}</version>
+        </dependency>
+        <!-- Minimal Spring AOP without starter aggregator -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-aop</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-            <version>${spring-boot.version}</version>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjrt</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <!-- Web utilities for RequestContextHolder/ServletRequestAttributes (non-transitive) -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-web</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <!-- Provided by application servers or spring-boot-starter-web (non-transitive) -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <scope>provided</scope>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.annotation</groupId>
+            <artifactId>jakarta.annotation-api</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+            <optional>true</optional>
+        </dependency>
+        
 
         <dependency>
             <groupId>org.apache.commons</groupId>
             <artifactId>commons-lang3</artifactId>
-            <version>${commons-lang3.version}</version>
         </dependency>
 
         <dependency>
@@ -56,12 +79,7 @@
             <version>${guava.version}</version>
         </dependency>
 
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-json</artifactId>
-            <version>${spring-boot.version}</version>
-            <scope>compile</scope>
-        </dependency>
+        <!-- JSON handled by spring-boot-starter-web; fastjson kept for custom usage -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -70,13 +88,14 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.14</version>
+            <version>1.18.30</version>
+            <scope>provided</scope>
         </dependency>
-
+        <!-- IDE 配置提示（编译期注解处理器，不会传递到下游） -->
         <dependency>
-            <groupId>org.apache.tomcat.embed</groupId>
-            <artifactId>tomcat-embed-core</artifactId>
-            <version>9.0.86</version>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-configuration-processor</artifactId>
+            <optional>true</optional>
         </dependency>
         <!-- https://mvnrepository.com/artifact/com.alibaba/fastjson -->
         <dependency>
@@ -84,17 +103,11 @@
             <artifactId>fastjson</artifactId>
             <version>2.0.50</version>
         </dependency>
-        <!-- https://mvnrepository.com/artifact/cn.xiaoandcai/json-diff -->
+        <!-- Object diff using JaVers -->
         <dependency>
-            <groupId>cn.xiaoandcai</groupId>
-            <artifactId>json-diff</artifactId>
-            <version>4.1.4-RC1-RELEASE</version>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/cn.xiaoandcai/json-diff-impl-fastjson -->
-        <dependency>
-            <groupId>cn.xiaoandcai</groupId>
-            <artifactId>json-diff-impl-fastjson</artifactId>
-            <version>4.1.4-RC1-RELEASE</version>
+            <groupId>org.javers</groupId>
+            <artifactId>javers-core</artifactId>
+            <version>6.6.0</version>
         </dependency>
 
     </dependencies>
@@ -118,7 +131,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-source-plugin</artifactId>
-                <version>3.0.1</version>
                 <configuration>
                     <attach>true</attach>
                 </configuration>
@@ -135,28 +147,11 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
-                <version>2.4</version>
                 <configuration>
                     <encoding>UTF-8</encoding>
                 </configuration>
             </plugin>
-            <!-- skip junit testcase. -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <skip>true</skip>
-                </configuration>
-                <version>2.12</version>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <source>8</source>
-                    <target>8</target>
-                </configuration>
-            </plugin>
+            <!-- enable tests: use Boot-managed Surefire defaults -->
 
         </plugins>
     </build>

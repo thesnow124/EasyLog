@@ -21,7 +21,7 @@ public class DefaultFunctionServiceImpl implements IFunctionService {
     public String apply(String functionName, Object value) {
         ICustomFunction function = customFunctionFactory.getFunction(functionName);
         if (function == null) {
-            return value.toString();
+            return String.valueOf(value);
         }
         return function.apply(value);
     }

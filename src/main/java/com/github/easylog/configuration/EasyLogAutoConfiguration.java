@@ -1,67 +1,66 @@
 package com.github.easylog.configuration;
 
 
+import com.github.easylog.aop.EasyLogAspect;
 import com.github.easylog.function.CustomFunctionFactory;
 import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.function.ICustomFunction;
 import com.github.easylog.function.IFunctionService;
-import com.github.easylog.function.impl.DefaultCustomFunction;
 import com.github.easylog.function.impl.DefaultFunctionServiceImpl;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
 import com.github.easylog.service.impl.DefaultLogRecordServiceImpl;
+import com.github.easylog.service.impl.JdbcLogRecordServiceImpl;
 import com.github.easylog.service.impl.DefaultOperatorServiceImpl;
 import com.github.easylog.util.EasyLogVersion;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.annotation.PostConstruct;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.config.BeanDefinition;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Role;
 
-import javax.annotation.PostConstruct;
+import javax.sql.DataSource;
 import java.util.List;
 
 /**
  * @author Gaosl
  */
 @Configuration
-@ComponentScan("com.github.easylog")
 @ConditionalOnProperty(prefix = "easylog", name = "enable", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties({EasyLogProperties.class})
+@RequiredArgsConstructor
+@Slf4j
 public class EasyLogAutoConfiguration {
 
-    @Autowired
-    private EasyLogProperties easyLogProperties;
+    private final EasyLogProperties easyLogProperties;
 
     @PostConstruct
     public void printBanner() {
         if (!easyLogProperties.isBanner()){
             return;
         }
-        System.out.println("                        _             \n" +
+        String banner = "                        _             \n" +
                 "                       | |            \n" +
                 "  ___  __ _ ___ _   _  | | ___   __ _ \n" +
                 " / _ \\/ _` / __| | | | | |/ _ \\ / _` |\n" +
                 "|  __/ (_| \\__ \\ |_| | | | (_) | (_| |\n" +
                 " \\___|\\__,_|___/\\__, | |_|\\___/ \\__, |\n" +
                 "                 __/ |           __/ |\n" +
-                "                |___/           |___/ \n");
-        System.out.println("  <<easy-log>>            " + EasyLogVersion.getVersion() + " ");
+                "                |___/           |___/ \n" +
+                "  <<easy-log>>            " + EasyLogVersion.getVersion();
+        log.info("\n{}", banner);
     }
 
     @Bean
-    @ConditionalOnMissingBean(ICustomFunction.class)
-    @Role(BeanDefinition.ROLE_APPLICATION)
-    public ICustomFunction customFunction() {
-        return new DefaultCustomFunction();
-    }
-
-    @Bean
-    public CustomFunctionFactory CustomFunctionRegistrar(@Autowired List<ICustomFunction> iCustomFunctionList) {
+    public CustomFunctionFactory customFunctionFactory(List<ICustomFunction> iCustomFunctionList) {
         return new CustomFunctionFactory(iCustomFunctionList);
     }
 
@@ -79,7 +78,15 @@ public class EasyLogAutoConfiguration {
     @ConditionalOnMissingBean(IOperatorService.class)
     @Role(BeanDefinition.ROLE_APPLICATION)
     public IOperatorService operatorGetService() {
-        return new DefaultOperatorServiceImpl();
+        return new DefaultOperatorServiceImpl(easyLogProperties);
+    }
+
+    @Bean
+    @ConditionalOnBean(DataSource.class)
+    @ConditionalOnMissingBean(ILogRecordService.class)
+    @Role(BeanDefinition.ROLE_APPLICATION)
+    public ILogRecordService jdbcRecordService(DataSource dataSource) {
+        return new JdbcLogRecordServiceImpl(dataSource);
     }
 
     @Bean
@@ -87,5 +94,15 @@ public class EasyLogAutoConfiguration {
     @Role(BeanDefinition.ROLE_APPLICATION)
     public ILogRecordService recordService() {
         return new DefaultLogRecordServiceImpl();
+    }
+
+    @Bean
+    @ConditionalOnClass(Aspect.class)
+    @ConditionalOnMissingBean(EasyLogAspect.class)
+    @Role(BeanDefinition.ROLE_INFRASTRUCTURE)
+    public EasyLogAspect easyLogAspect(ILogRecordService logRecordService,
+                                       IOperatorService operatorService,
+                                       EasyLogParser easyLogParser) {
+        return new EasyLogAspect(logRecordService, operatorService, easyLogParser);
     }
 }
