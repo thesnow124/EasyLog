@@ -1,8 +1,8 @@
 package com.github.easylog.support;
 
 import com.alibaba.fastjson2.JSON;
-import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.api.ILogRecordService;
+import com.github.easylog.model.EasyLogInfo;
 
 import javax.sql.DataSource;
 import java.sql.Connection;

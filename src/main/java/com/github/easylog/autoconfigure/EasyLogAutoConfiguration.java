@@ -2,12 +2,12 @@ package com.github.easylog.autoconfigure;
 
 
 import com.github.easylog.aop.EasyLogAspect;
-import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.api.ILogRecordService;
 import com.github.easylog.api.IOperatorService;
+import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.support.DefaultLogRecordServiceImpl;
-import com.github.easylog.support.JdbcLogRecordServiceImpl;
 import com.github.easylog.support.DefaultOperatorServiceImpl;
+import com.github.easylog.support.JdbcLogRecordServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.annotation.Aspect;
@@ -22,7 +22,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Role;
 
 import javax.sql.DataSource;
-import java.util.List;
 
 /**
  * @author Gaosl

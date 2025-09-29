@@ -4,10 +4,10 @@ import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.compare.Equator;
 import com.github.easylog.compare.FieldInfo;
 import com.github.easylog.constants.OperateType;
+import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import jakarta.annotation.Resource;
 import java.util.List;
 
 @SpringBootTest
