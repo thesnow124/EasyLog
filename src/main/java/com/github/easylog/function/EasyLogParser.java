@@ -19,18 +19,31 @@ import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * 核心模板解析器，支持两类占位：
+ * <ul>
+ *     <li>自定义函数块：<code>{funcName{ SpEL }}</code>，可配置前置/后置执行。</li>
+ *     <li>纯 SpEL 块：<code>{{ SpEL }}</code>，可引用参数、返回值、异常信息或 Spring Bean。</li>
+ * </ul>
+ * 解析流程：前置阶段缓存需要提前执行的函数结果；后置阶段先替换函数块，再替换 SpEL，最后回退解析纯表达式。
+ */
 @Slf4j
 public class EasyLogParser implements BeanFactoryAware {
 
     private BeanFactory beanFactory;
+    private final ParseFunctionFactory parseFunctionFactory;
 
-    // Match {{ SpEL }} blocks
+    private static final Pattern FUNC_BLOCK = Pattern.compile("\\{\\s*([\\w.-]+)\\s*\\{(.*?)\\}\\s*\\}");
     private static final Pattern SPEL_BLOCK = Pattern.compile("\\{\\{\\s*(.*?)\\s*}}");
 
     private final EasyLogCachedExpressionEvaluator cachedExpressionEvaluator = new EasyLogCachedExpressionEvaluator();
 
+    public EasyLogParser(ParseFunctionFactory parseFunctionFactory) {
+        this.parseFunctionFactory = parseFunctionFactory;
+    }
+
     /**
-     * After method execution: render all templates. Expressions pre-evaluated in before-phase are reused.
+     * After method execution: render all templates. Functions pre-evaluated in before-phase are reused.
      */
     public Map<String, String> processAfterExec(List<String> expressTemplate,
                                                 Map<String, String> beforeCache,
@@ -46,14 +59,15 @@ public class EasyLogParser implements BeanFactoryAware {
         AnnotatedElementKey elementKey = new AnnotatedElementKey(method, targetClass);
         EvaluationContext ctx = cachedExpressionEvaluator.createEvaluationContext(method, args, beanFactory, errMsg, result);
         for (String template : expressTemplate) {
-            String resolved = resolveTemplate(template, elementKey, ctx, beforeCache, true);
+            String resolved = resolveTemplate(template, elementKey, ctx, beforeCache);
             map.put(template, resolved);
         }
         return map;
     }
 
     /**
-     * Before method execution: pre-evaluate expressions that don't depend on result/err.
+     * Before method execution: pre-evaluate functions that声明 executeBefore=true.
+     * 仅会缓存标记为前置执行的自定义函数，避免业务执行后再取“旧值”。
      */
     public Map<String, String> processBeforeExec(List<String> templates,
                                                  Method method,
@@ -66,56 +80,95 @@ public class EasyLogParser implements BeanFactoryAware {
         AnnotatedElementKey elementKey = new AnnotatedElementKey(method, targetClass);
         EvaluationContext ctx = cachedExpressionEvaluator.createEvaluationContext(method, args, beanFactory, null, null);
         for (String template : templates) {
-            Matcher m = SPEL_BLOCK.matcher(template);
+            Matcher m = FUNC_BLOCK.matcher(template);
             while (m.find()) {
-                String expr = m.group(1);
-                if (dependsOnResult(expr) || isAfterMarker(expr)) {
+                String placeholder = m.group(0);
+                String funcName = m.group(1);
+                // 仅处理标记为“前置执行”的自定义函数，典型用于查询旧值
+                if (!parseFunctionFactory.isBeforeFunction(funcName)) {
                     continue;
                 }
-                Object val = safeEval(expr, elementKey, ctx);
-                cache.put(expr, val == null ? "" : String.valueOf(val));
+                String expr = m.group(2);
+                // 先解析函数参数中的 SpEL，再把结果传给自定义函数
+                String spelVal = stringVal(safeEval(expr, elementKey, ctx));
+                String fnVal = applyFunction(funcName, spelVal);
+                // 使用整个占位符作为 key，后置阶段遇到同样占位符时直接复用
+                cache.put(placeholder, fnVal);
             }
-            // plain expressions without {{}} are not pre-evaluated here
         }
         return cache;
-    }
-
-    private boolean dependsOnResult(String expr) {
-        return expr != null && (expr.contains(EasyLogConsts.POUND_KEY + EasyLogConsts.ERR_MSG)
-                || expr.contains(EasyLogConsts.POUND_KEY + EasyLogConsts.RESULT));
     }
 
     private String resolveTemplate(String template,
                                    AnnotatedElementKey elementKey,
                                    EvaluationContext ctx,
-                                   Map<String, String> beforeCache,
-                                   boolean allowWholeExpr) {
-        Matcher m = SPEL_BLOCK.matcher(template);
-        StringBuffer sb = new StringBuffer();
-        boolean any = false;
-        while (m.find()) {
-            any = true;
-            String expr = m.group(1);
-            String replacement = beforeCache != null && beforeCache.containsKey(expr)
-                    ? beforeCache.get(expr)
-                    : stringVal(safeEval(expr, elementKey, ctx));
-            // escape replacement for matcher
-            replacement = Matcher.quoteReplacement(replacement);
-            m.appendReplacement(sb, replacement);
+                                   Map<String, String> beforeCache) {
+        // step1: replace function blocks（处理 {funcName{...}} 占位，优先用前置缓存）
+        Matcher funcMatcher = FUNC_BLOCK.matcher(template);
+        StringBuilder funcBuf = new StringBuilder();
+        boolean funcMatched = false;
+        while (funcMatcher.find()) {
+            funcMatched = true;
+            String placeholder = funcMatcher.group(0);
+            String funcName = funcMatcher.group(1);
+            String expr = funcMatcher.group(2);
+            // 如果前置阶段已缓存该占位结果，直接复用；否则现算
+            String replacement = beforeCache != null && beforeCache.containsKey(placeholder)
+                    ? beforeCache.get(placeholder)
+                    : applyFunction(funcName, stringVal(safeEval(expr, elementKey, ctx)));
+            funcMatcher.appendReplacement(funcBuf, Matcher.quoteReplacement(replacement));
         }
-        m.appendTail(sb);
-        if (any) {
-            return sb.toString();
+        funcMatcher.appendTail(funcBuf);
+        String afterFunction = funcBuf.toString();
+
+        // step2: replace SpEL blocks {{ ... }}（处理纯 SpEL 占位）
+        Matcher spelMatcher = SPEL_BLOCK.matcher(afterFunction);
+        StringBuilder spelBuf = new StringBuilder();
+        boolean spelMatched = false;
+        while (spelMatcher.find()) {
+            spelMatched = true;
+            String expr = spelMatcher.group(1);
+            String replacement = stringVal(safeEval(expr, elementKey, ctx));
+            spelMatcher.appendReplacement(spelBuf, Matcher.quoteReplacement(replacement));
         }
-        // if template is a plain SpEL (without {{}}), evaluate as whole
-        if (allowWholeExpr) {
-            Object v = safeEval(template, elementKey, ctx);
+        spelMatcher.appendTail(spelBuf);
+        String replaced = spelBuf.toString();
+
+        // step3: if no placeholder matched but it is a plain expression, evaluate whole
+        if (!funcMatched && !spelMatched && isPlainExpression(replaced)) {
+            Object v = safeEval(replaced, elementKey, ctx);
             return v == null ? "" : String.valueOf(v);
         }
-        return template;
+        return replaced;
+    }
+
+    private boolean isPlainExpression(String value) {
+        if (value == null) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return trimmed.startsWith(EasyLogConsts.POUND_KEY) || trimmed.startsWith("@") || trimmed.startsWith("T(");
+    }
+
+    private String applyFunction(String funcName, String arg) {
+        ParseFunction function = parseFunctionFactory.getFunction(funcName);
+        if (function == null) {
+            log.warn("未找到自定义函数: {}", funcName);
+            return arg == null ? "" : arg;
+        }
+        try {
+            String val = function.apply(arg);
+            return val == null ? "" : val;
+        } catch (Exception e) {
+            log.warn("自定义函数执行异常: {}", funcName, e);
+            return "";
+        }
     }
 
     private Object safeEval(String expr, AnnotatedElementKey key, EvaluationContext ctx) {
+        if (expr == null) {
+            return null;
+        }
         try {
             return cachedExpressionEvaluator.parseExpression(expr, key, ctx);
         } catch (Exception e) {
@@ -124,16 +177,13 @@ public class EasyLogParser implements BeanFactoryAware {
         }
     }
 
-    private boolean isAfterMarker(String expr) {
-        // If expression intentionally wrapped with @easyLogPhase.after(...),
-        // defer to after-phase regardless of result dependency.
-        return expr != null && expr.replaceAll("\\s+", "").startsWith("@easyLogPhase.after(");
-    }
-
     private String stringVal(Object v) {
-        if (v == null) return "";
-        if (v instanceof CharSequence) return v.toString();
-        // 对于非字符串结果，默认序列化为 JSON 文本，便于在 detail 的 [old,new] 中直接形成合法 JSON
+        if (v == null) {
+            return "";
+        }
+        if (v instanceof CharSequence) {
+            return v.toString();
+        }
         try { return JSON.toJSONString(v); } catch (Exception ignore) { return String.valueOf(v); }
     }
 

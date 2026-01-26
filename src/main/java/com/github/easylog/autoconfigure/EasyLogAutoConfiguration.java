@@ -5,6 +5,8 @@ import com.github.easylog.aop.EasyLogAspect;
 import com.github.easylog.api.ILogRecordService;
 import com.github.easylog.api.IOperatorService;
 import com.github.easylog.function.EasyLogParser;
+import com.github.easylog.function.ParseFunction;
+import com.github.easylog.function.ParseFunctionFactory;
 import com.github.easylog.support.DefaultLogRecordServiceImpl;
 import com.github.easylog.support.DefaultOperatorServiceImpl;
 import com.github.easylog.support.JdbcLogRecordServiceImpl;
@@ -24,6 +26,19 @@ import org.springframework.context.annotation.Role;
 import javax.sql.DataSource;
 
 /**
+ * Auto-configuration entry for the EasyLog SDK.
+ * <p>
+ * This class wires the following pieces when {@code easylog.enable=true} (default):
+ * <ul>
+ *     <li>Template parsing infrastructure ({@link com.github.easylog.function.EasyLogParser}) and the function registry.</li>
+ *     <li>Default operator/provider beans that can be overridden by user beans.</li>
+ *     <li>Log storage selection：in-memory log printing by default, JDBC storage when a {@link javax.sql.DataSource}
+ *     is present and {@code easylog.store=jdbc}.</li>
+ *     <li>AOP aspect that captures method invocations and renders operation logs.</li>
+ * </ul>
+ * All beans are defined with {@code @ConditionalOnMissingBean} so business projects can provide their own implementations
+ * without touching SDK code.
+ *
  * @author Gaosl
  */
 @AutoConfiguration
@@ -36,8 +51,13 @@ public class EasyLogAutoConfiguration {
     private final EasyLogProperties easyLogProperties;
 
     @Bean
-    public EasyLogParser easyLogParser() {
-        return new EasyLogParser();
+    public ParseFunctionFactory parseFunctionFactory(java.util.List<ParseFunction> parseFunctions) {
+        return new ParseFunctionFactory(parseFunctions);
+    }
+
+    @Bean
+    public EasyLogParser easyLogParser(ParseFunctionFactory parseFunctionFactory) {
+        return new EasyLogParser(parseFunctionFactory);
     }
 
     @Bean(name = "easyLogPhase")

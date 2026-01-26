@@ -23,6 +23,13 @@ import java.util.regex.Pattern;
 
 /**
  * 使用 JaVers 对 JSON 对象进行差异对比，输出字段变更列表。
+ * <p>
+ * 特性：
+ * <ul>
+ *     <li>忽略 List 顺序（SIMPLE 算法），便于对比表单类 JSON。</li>
+ *     <li>自动将日期/科学计数等值转为可读字符串，避免展示 “1970-01-01” 等默认值。</li>
+ *     <li>非 JSON 输入时退化为简单的旧/新值记录。</li>
+ * </ul>
  * @author gaoshuanglong
  */
 @Slf4j
@@ -119,4 +126,3 @@ public class Equator {
         return str;
     }
 }
-

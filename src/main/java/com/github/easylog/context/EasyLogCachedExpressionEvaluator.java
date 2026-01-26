@@ -13,6 +13,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 
 /**
+ * 缓存版 SpEL 解析器，复用 Spring {@link CachedExpressionEvaluator} 的 key 缓存能力，
+ * 避免重复编译表达式；同时在创建 EvaluationContext 时注入 BeanFactoryResolver 以支持 @bean 调用。
  * @author Gaosl
  */
 public class EasyLogCachedExpressionEvaluator extends CachedExpressionEvaluator {

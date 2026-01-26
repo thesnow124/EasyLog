@@ -32,6 +32,14 @@ import java.util.stream.Collectors;
 
 /**
  * 操作日志切面（精简版，逻辑保持不变）。
+ * <p>
+ * 核心职责：
+ * <ol>
+ *     <li>在方法执行前解析注解与模板，预先计算需要前置执行的自定义函数（如“查询旧值”）。</li>
+ *     <li>执行业务方法，捕获返回结果或异常，同时记录耗时与请求上下文。</li>
+ *     <li>在方法执行后渲染模板（成功/失败、SpEL、自定义函数、占位符），构造 {@link EasyLogInfo} 并交给存储层。</li>
+ * </ol>
+ * 任何解析/存储异常都被吞掉以避免影响业务主流程。
  */
 @Aspect
 @Slf4j
@@ -65,24 +73,21 @@ public class EasyLogAspect {
         Object target = joinPoint.getTarget();
         Class<?> targetClass = AopUtils.getTargetClass(target);
 
-        // 方法前逻辑
+        // 方法前逻辑：解析注解、提取模板、执行前置函数
         List<String> expressTemplateList = new ArrayList<>();
         Map<String, String> customFunctionExecResultMap = new HashMap<>();
         List<EasyLogOps> easyLogOpsList = new ArrayList<>();
         try {
-            List<EasyLogOps> ops = new ArrayList<>();
             EasyLog[] logList = method.getAnnotationsByType(EasyLog.class);
-            ops.addAll(Arrays.stream(logList)
-                    .map(EasyLogAspectHelper::parseLogAnnotation)
-                    .collect(Collectors.toList()));
-            easyLogOpsList = ops;
+            easyLogOpsList = Arrays.stream(logList)
+                    .map(EasyLogAspectHelper::parseLogAnnotation).collect(Collectors.toList());
             expressTemplateList = EasyLogAspectHelper.getExpressTemplate(easyLogOpsList);
             customFunctionExecResultMap = easyLogParser.processBeforeExec(expressTemplateList, method, args, targetClass);
         } catch (Exception e) {
             log.info("方法前逻辑发生异常", e);
         }
 
-        // 解析通用信息
+        // 解析通用信息：请求元数据、参数快照、类名+方法名
         MethodExecuteResult executeResult = new MethodExecuteResult(true);
         try {
             String classMethod = String.format("%s.%s", methodSignature.getDeclaringTypeName(), methodSignature.getName());
@@ -102,7 +107,7 @@ public class EasyLogAspect {
             log.info("解析通用信息发生异常", e);
         }
 
-        // 方法逻辑
+        // 方法逻辑：执行业务方法并捕获结果/异常；使用上下文栈隔离嵌套调用
         try {
             EasyLogContext.push();
             Object result = joinPoint.proceed();
@@ -114,11 +119,12 @@ public class EasyLogAspect {
             EasyLogContext.clearIfEmpty();
         }
 
-        // 方法后逻辑
+        // 方法后逻辑：渲染模板 -> 生成日志 -> 落地
         try {
             Map<String, String> templateMap = easyLogParser.processAfterExec(
                     expressTemplateList, customFunctionExecResultMap, method, args, targetClass,
                     executeResult.getErrMsg(), executeResult.getResult());
+
             List<EasyLogInfo> easyLogInfos = EasyLogAspectHelper.createEasyLogInfo(
                     templateMap, easyLogOpsList, executeResult, operatorService);
             easyLogInfos.forEach(easyLogInfo -> {
@@ -152,6 +158,7 @@ public class EasyLogAspect {
         if (afterCommit && org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
             org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
                     new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
                         public void afterCommit() {
                             for (EasyLogInfo logInfo : logs) {
                                 try { logRecordService.record(logInfo); } catch (Exception ignore) {}
@@ -166,4 +173,3 @@ public class EasyLogAspect {
         }
     }
 }
-

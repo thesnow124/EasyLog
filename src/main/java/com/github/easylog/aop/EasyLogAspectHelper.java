@@ -32,6 +32,9 @@ import java.util.stream.Collectors;
 final class EasyLogAspectHelper {
     private EasyLogAspectHelper() {}
 
+    /**
+     * 将注解解析为内部操作对象，方便后续统一处理。
+     */
     static EasyLogOps parseLogAnnotation(EasyLog easyLog) {
         EasyLogOps easyLogOps = new EasyLogOps();
         easyLogOps.setSuccess(easyLog.success());
@@ -48,6 +51,9 @@ final class EasyLogAspectHelper {
         return easyLogOps;
     }
 
+    /**
+     * 收集所有需要解析的模板片段（SpEL、自定义函数、条件等），用于统一前/后置渲染。
+     */
     static List<String> getExpressTemplate(List<EasyLogOps> easyLogOpsList) {
         Set<String> set = new HashSet<>();
         for (EasyLogOps easyLogOps : easyLogOpsList) {
@@ -68,6 +74,9 @@ final class EasyLogAspectHelper {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 构建方法参数快照。MultipartFile/HttpServletRequest 等不可序列化类型会转成可读占位值。
+     */
     static Map<String, Object> buildRequestParam(String[] paramNames, Object[] paramValues) {
         Map<String, Object> requestParams = new HashMap<>(16);
         if (paramNames == null) {
@@ -88,6 +97,9 @@ final class EasyLogAspectHelper {
         return requestParams;
     }
 
+    /**
+     * 尝试从常见代理头中提取客户端 IP，失败则回落到 remoteAddr。
+     */
     static String extractClientIp(HttpServletRequest request) {
         try {
             String xff = request.getHeader("X-Forwarded-For");
@@ -95,15 +107,22 @@ final class EasyLogAspectHelper {
                 String[] parts = xff.split(",");
                 for (String p : parts) {
                     String ip = p.trim();
-                    if (!ip.isEmpty()) return ip;
+                    if (!ip.isEmpty()) {
+                        return ip;
+                    }
                 }
             }
             String real = request.getHeader("X-Real-IP");
-            if (!ObjectUtils.isEmpty(real)) return real;
+            if (!ObjectUtils.isEmpty(real)) {
+                return real;
+            }
         } catch (Exception ignored) {}
         return request.getRemoteAddr();
     }
 
+    /**
+     * 根据模板渲染结果生成最终的日志实体列表（成功/失败、占位符、条件过滤、差异计算）。
+     */
     static List<EasyLogInfo> createEasyLogInfo(Map<String, String> templateMap,
                                                List<EasyLogOps> easyLogOpsList,
                                                MethodExecuteResult executeResult,
@@ -119,6 +138,7 @@ final class EasyLogAspectHelper {
             if (!shouldRecord) {
                 continue;
             }
+            // 基础信息：是否记录、操作人/平台、模块、类型、业务标识、详情等
             EasyLogInfo easyLogInfo = new EasyLogInfo();
             easyLogInfo.setCondition(ObjectUtils.isEmpty(conditionKey) ? "true" : templateMap.get(conditionKey));
             String platform = templateMap.getOrDefault(easyLogOps.getPlatform(), operatorService.getPlatform());
@@ -133,10 +153,12 @@ final class EasyLogAspectHelper {
             String contentKey = easyLogOps.getSuccess();
             String[] paramKeyList = easyLogOps.getSuccessParamList();
             if (!executeResult.isSuccess()) {
+                // 执行失败时切换到 fail 模板及其参数列表
                 contentKey = easyLogOps.getFail();
                 paramKeyList = easyLogOps.getFailParamList();
             }
             easyLogInfo.setContent(templateMap.get(contentKey));
+            // 渲染内容参数，缺失时回退为空串以防 NPE
             String[] array = Arrays.stream(paramKeyList)
                     .map(k -> {
                         String v = templateMap.get(k);
@@ -144,6 +166,7 @@ final class EasyLogAspectHelper {
                     })
                     .toArray(String[]::new);
             easyLogInfo.setContentParam(array);
+            // 差异详情：解析 JSON，生成字段级差异列表
             easyLogInfo.setFieldInfoList(getFieldInfoList(easyLogInfo.getDetail()));
             easyLogInfos.add(easyLogInfo);
         }
@@ -176,4 +199,3 @@ final class EasyLogAspectHelper {
         return Equator.getDiffField(oldBean, newBean);
     }
 }
-

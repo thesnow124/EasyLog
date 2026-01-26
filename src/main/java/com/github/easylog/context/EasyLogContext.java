@@ -9,6 +9,8 @@ import java.util.Map;
  * Thread-local variable context for templates (SpEL) to consume.
  * Typical usage in business code within an annotated method:
  *   EasyLogContext.put("oldAddress", value);
+ * <p>
+ * 内部使用栈结构以支持嵌套的注解方法调用，避免变量互相覆盖/污染。push/pop 由切面控制，业务只需 put/get。
  */
 public final class EasyLogContext {
 
@@ -77,4 +79,3 @@ public final class EasyLogContext {
         return map == null ? new HashMap<>() : map;
     }
 }
-

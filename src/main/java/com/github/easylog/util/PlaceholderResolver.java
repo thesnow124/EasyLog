@@ -9,10 +9,10 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 
 /**
+ * 轻量占位符解析工具，默认解析形如 {@code ${}} 的顺序占位符。
+ * 与 Spring 的 PropertyPlaceholder 类似，但更简单：不支持嵌套/默认值，仅按顺序或 Map/规则替换。
+ * 在 EasyLog 中用于将模板中的 `${}` 替换为渲染后的 SpEL 结果。
  * @author Gaosl
- * @project EasyLog
- * @description 解析占位符
- * @date 2024/5/14 15:03:25
  */
 public class PlaceholderResolver {
     /**

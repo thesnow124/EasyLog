@@ -12,7 +12,9 @@ import java.sql.Timestamp;
 import java.util.Optional;
 
 /**
- * JDBC 实现：存在 DataSource 且未自定义 ILogRecordService 时自动启用
+ * JDBC 实现：存在 DataSource 且未自定义 ILogRecordService 时自动启用。
+ * <p>
+ * 采用最小字段映射并使用 best-effort 模式：写库异常被吞掉，避免影响业务事务。
  */
 public class JdbcLogRecordServiceImpl implements ILogRecordService {
 
