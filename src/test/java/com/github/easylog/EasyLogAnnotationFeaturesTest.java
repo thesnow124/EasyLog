@@ -115,7 +115,7 @@ class EasyLogAnnotationFeaturesTest {
         assertEquals("[{\"age\":1},{\"age\":2}]", log.getDetail().replaceAll("\\s", ""));
         List<FieldInfo> fields = log.getFieldInfoList();
         assertEquals(1, fields.size());
-        assertEquals("age", fields.get(0).getFieldName());
+        assertEquals("map[age]", fields.get(0).getFieldName());
         assertEquals("1", fields.get(0).getOldFieldVal());
         assertEquals("2", fields.get(0).getNewFieldVal());
     }

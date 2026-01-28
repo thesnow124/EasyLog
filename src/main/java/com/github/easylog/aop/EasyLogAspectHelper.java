@@ -183,14 +183,16 @@ final class EasyLogAspectHelper {
             fieldDiff.setVal(detail);
             return Collections.singletonList(fieldDiff);
         }
+        // 支持 detail=[old,new,...] 形式的 JSON 数组，取第一个元素为旧值，最后一个元素为新值
         String oldBean = null;
         String newBean = detail;
         if (o instanceof JSONArray) {
             List<String> list = JSON.parseArray(detail, String.class);
-            if (!CollectionUtils.isEmpty(list)) {
-                oldBean = list.stream().findFirst().orElse(null);
-                newBean = list.stream().skip(1).findFirst().orElse(null);
+            if (CollectionUtils.isEmpty(list)) {
+                return Collections.emptyList();
             }
+            oldBean = list.get(0);
+            newBean = list.size() > 1 ? list.get(list.size() - 1) : null;
         } else {
             FieldInfo fieldDiff = new FieldInfo();
             fieldDiff.setVal(detail);

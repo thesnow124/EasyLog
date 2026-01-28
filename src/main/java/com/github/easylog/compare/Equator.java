@@ -9,7 +9,18 @@ import org.javers.core.diff.Change;
 import org.javers.core.diff.Diff;
 import org.javers.core.diff.ListCompareAlgorithm;
 import org.javers.core.diff.changetype.PropertyChange;
+import org.javers.core.diff.changetype.ReferenceChange;
 import org.javers.core.diff.changetype.ValueChange;
+import org.javers.core.diff.changetype.container.ContainerChange;
+import org.javers.core.diff.changetype.container.ContainerElementChange;
+import org.javers.core.diff.changetype.container.ElementValueChange;
+import org.javers.core.diff.changetype.container.ValueAdded;
+import org.javers.core.diff.changetype.container.ValueRemoved;
+import org.javers.core.diff.changetype.map.EntryAdded;
+import org.javers.core.diff.changetype.map.EntryChange;
+import org.javers.core.diff.changetype.map.EntryRemoved;
+import org.javers.core.diff.changetype.map.EntryValueChange;
+import org.javers.core.diff.changetype.map.MapChange;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -46,35 +57,112 @@ public class Equator {
     private static final DateTimeFormatter FORMATTER_WITHOUT_SECONDS = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
 
     public static List<FieldInfo> getDiffField(String oldBean, String newBean) {
-        if (Objects.isNull(oldBean)) oldBean = "{}";
-        if (Objects.isNull(newBean)) newBean = "{}";
-        if (!isJsonString(oldBean) || !isJsonString(newBean)) {
+        // 1) 空输入直接返回空
+        if (oldBean == null && newBean == null) {
+            return Collections.emptyList();
+        }
+        String oldStr = oldBean == null ? "" : oldBean;
+        String newStr = newBean == null ? "" : newBean;
+        // 2) 任一非 JSON：不做字段拆分，原样记录旧/新值
+        if (!isJsonString(oldStr) || !isJsonString(newStr)) {
             FieldInfo fieldDiff = new FieldInfo();
-            fieldDiff.setOldFieldVal(oldBean);
-            fieldDiff.setNewFieldVal(newBean);
+            fieldDiff.setOldFieldVal(oldStr);
+            fieldDiff.setNewFieldVal(newStr);
             return Collections.singletonList(fieldDiff);
         }
 
-        Object left = toComparable(oldBean);
-        Object right = toComparable(newBean);
+        // 3) JSON：转成可比对象后用 JaVers 计算差异
+        Object left = toComparable(oldStr);
+        Object right = toComparable(newStr);
         Diff diff = JAVERS_IGNORE_LIST_ORDER.compare(left, right);
         if (!diff.hasChanges()) return new ArrayList<>();
 
         List<FieldInfo> list = new ArrayList<>();
         for (Change change : diff.getChanges()) {
-            if (change instanceof PropertyChange) {
-                PropertyChange pc = (PropertyChange) change;
-                if (pc instanceof ValueChange) {
-                    ValueChange vc = (ValueChange) pc;
+            if (change instanceof ValueChange) {
+                // 简单属性值变更
+                ValueChange vc = (ValueChange) change;
+                FieldInfo f = new FieldInfo();
+                f.setFieldName(vc.getPropertyNameWithPath());
+                f.setOldFieldVal(formatValue(vc.getLeft()));
+                f.setNewFieldVal(formatValue(vc.getRight()));
+                list.add(f);
+            } else if (change instanceof ReferenceChange) {
+                // 引用对象变更（取左右对象，若不存在用 GlobalId）
+                ReferenceChange rc = (ReferenceChange) change;
+                FieldInfo f = new FieldInfo();
+                f.setFieldName(rc.getPropertyNameWithPath());
+                f.setOldFieldVal(formatValue(rc.getLeftObject().orElse(rc.getLeft())));
+                f.setNewFieldVal(formatValue(rc.getRightObject().orElse(rc.getRight())));
+                list.add(f);
+            } else if (change instanceof MapChange) {
+                // Map 键值变化：新增/删除/值变更
+                MapChange<?> mc = (MapChange<?>) change;
+                String base = mc.getPropertyNameWithPath();
+                for (EntryChange ec : mc.getEntryChanges()) {
                     FieldInfo f = new FieldInfo();
-                    f.setFieldName(pc.getPropertyNameWithPath());
-                    f.setOldFieldVal(formatValue(vc.getLeft()));
-                    f.setNewFieldVal(formatValue(vc.getRight()));
+                    f.setFieldName(base + "[" + formatValue(ec.getKey()) + "]");
+                    if (ec instanceof EntryAdded) {
+                        f.setOldFieldVal("");
+                        f.setNewFieldVal(formatValue(((EntryAdded) ec).getValue()));
+                    } else if (ec instanceof EntryRemoved) {
+                        f.setOldFieldVal(formatValue(((EntryRemoved) ec).getValue()));
+                        f.setNewFieldVal("");
+                    } else if (ec instanceof EntryValueChange) {
+                        EntryValueChange evc = (EntryValueChange) ec;
+                        f.setOldFieldVal(formatValue(evc.getLeftValue()));
+                        f.setNewFieldVal(formatValue(evc.getRightValue()));
+                    } else {
+                        // 未知场景兜底
+                        f.setOldFieldVal(formatValue(mc.getLeft()));
+                        f.setNewFieldVal(formatValue(mc.getRight()));
+                    }
                     list.add(f);
                 }
+            } else if (change instanceof ContainerChange) {
+                // List/Set 等集合：新增、删除、元素值变更
+                ContainerChange<?> cc = (ContainerChange<?>) change;
+                String base = cc.getPropertyNameWithPath();
+                for (ValueAdded add : cc.getValueAddedChanges()) {
+                    FieldInfo f = new FieldInfo();
+                    f.setFieldName(appendIndex(base, add.getIndex(), "+"));
+                    f.setOldFieldVal("");
+                    f.setNewFieldVal(formatValue(add.getAddedValue()));
+                    list.add(f);
+                }
+                for (ValueRemoved rem : cc.getValueRemovedChanges()) {
+                    FieldInfo f = new FieldInfo();
+                    f.setFieldName(appendIndex(base, rem.getIndex(), "-"));
+                    f.setOldFieldVal(formatValue(rem.getRemovedValue()));
+                    f.setNewFieldVal("");
+                    list.add(f);
+                }
+                for (ContainerElementChange elementChange : cc.getChanges()) {
+                    if (elementChange instanceof ElementValueChange) {
+                        ElementValueChange evc = (ElementValueChange) elementChange;
+                        FieldInfo f = new FieldInfo();
+                        f.setFieldName(appendIndex(base, evc.getIndex(), null));
+                        f.setOldFieldVal(formatValue(evc.getLeftValue()));
+                        f.setNewFieldVal(formatValue(evc.getRightValue()));
+                        list.add(f);
+                    }
+                }
+            } else if (change instanceof PropertyChange) {
+                // 其他属性变更兜底
+                PropertyChange pc = (PropertyChange) change;
+                FieldInfo f = new FieldInfo();
+                f.setFieldName(pc.getPropertyNameWithPath());
+                f.setOldFieldVal(formatValue(pc.getLeft()));
+                f.setNewFieldVal(formatValue(pc.getRight()));
+                list.add(f);
             }
         }
         return list;
+    }
+
+    private static String appendIndex(String base, Integer idx, String suffixFlag) {
+        String suffix = idx == null ? (suffixFlag == null ? "[*]" : "[" + suffixFlag + "]") : "[" + idx + "]";
+        return base + suffix;
     }
 
     private static boolean isJsonString(String str) {
