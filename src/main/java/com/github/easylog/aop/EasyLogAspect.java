@@ -154,7 +154,9 @@ public class EasyLogAspect {
     }
 
     private void recordLogs(List<EasyLogInfo> logs) {
-        if (logs == null || logs.isEmpty()) return;
+        if (logs == null || logs.isEmpty()) {
+            return;
+        }
         if (afterCommit && org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
             org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
                     new org.springframework.transaction.support.TransactionSynchronization() {
