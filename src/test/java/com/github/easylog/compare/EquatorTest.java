@@ -25,15 +25,15 @@ class EquatorTest {
     }
 
     @Test
-    void formatsDateAndNumberValues() {
+    void keepsRawDateAndNumberValues() {
         String oldJson = "{\"t\":\"2024-01-02T03:04:05\",\"n\":\"1.2300\"}";
         String newJson = "{\"t\":\"2024-01-02T03:04:06\",\"n\":\"2.5000\"}";
         List<FieldInfo> diff = Equator.getDiffField(oldJson, newJson);
         assertFalse(diff.isEmpty());
-        assertTrue(diff.stream().anyMatch(f -> "2024-01-02 03:04:05".equals(f.getOldFieldVal())));
-        assertTrue(diff.stream().anyMatch(f -> "2024-01-02 03:04:06".equals(f.getNewFieldVal())));
-        assertTrue(diff.stream().anyMatch(f -> "1.23".equals(f.getOldFieldVal())));
-        assertTrue(diff.stream().anyMatch(f -> "2.5".equals(f.getNewFieldVal())));
+        assertTrue(diff.stream().anyMatch(f -> "2024-01-02T03:04:05".equals(f.getOldFieldVal())));
+        assertTrue(diff.stream().anyMatch(f -> "2024-01-02T03:04:06".equals(f.getNewFieldVal())));
+        assertTrue(diff.stream().anyMatch(f -> "1.2300".equals(f.getOldFieldVal())));
+        assertTrue(diff.stream().anyMatch(f -> "2.5000".equals(f.getNewFieldVal())));
     }
 
     @Test
