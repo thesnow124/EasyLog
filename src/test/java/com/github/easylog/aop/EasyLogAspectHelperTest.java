@@ -1,7 +1,7 @@
 package com.github.easylog.aop;
 
 import com.github.easylog.annotation.EasyLog;
-import com.github.easylog.api.IOperatorService;
+import com.github.easylog.service.IOperatorService;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;

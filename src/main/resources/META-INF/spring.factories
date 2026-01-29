@@ -1,2 +1,2 @@
 org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
-com.github.easylog.autoconfigure.EasyLogAutoConfiguration
+com.github.easylog.configuration.EasyLogAutoConfiguration

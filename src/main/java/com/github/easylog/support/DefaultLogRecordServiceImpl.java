@@ -2,7 +2,7 @@ package com.github.easylog.support;
 
 
 import com.alibaba.fastjson2.JSON;
-import com.github.easylog.api.ILogRecordService;
+import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.util.PlaceholderResolver;
 import lombok.extern.slf4j.Slf4j;

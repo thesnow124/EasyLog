@@ -1,4 +1,4 @@
-package com.github.easylog.autoconfigure;
+package com.github.easylog.configuration;
 
 import lombok.Getter;
 import lombok.Setter;

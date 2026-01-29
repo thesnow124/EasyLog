@@ -3,7 +3,7 @@ package com.github.easylog.aop;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.github.easylog.annotation.EasyLog;
-import com.github.easylog.api.IOperatorService;
+import com.github.easylog.service.IOperatorService;
 import com.github.easylog.compare.Equator;
 import com.github.easylog.compare.FieldInfo;
 import com.github.easylog.model.EasyLogInfo;

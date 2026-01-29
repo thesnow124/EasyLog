@@ -2,8 +2,8 @@ package com.github.easylog.aop;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.easylog.annotation.EasyLog;
-import com.github.easylog.api.ILogRecordService;
-import com.github.easylog.api.IOperatorService;
+import com.github.easylog.service.ILogRecordService;
+import com.github.easylog.service.IOperatorService;
 import com.github.easylog.context.EasyLogContext;
 import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.model.EasyLogInfo;

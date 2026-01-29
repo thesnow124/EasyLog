@@ -1,4 +1,4 @@
-package com.github.easylog.api;
+package com.github.easylog.service;
 
 import com.github.easylog.model.EasyLogInfo;
 

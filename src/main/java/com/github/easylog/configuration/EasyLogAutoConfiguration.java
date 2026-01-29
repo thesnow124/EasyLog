@@ -1,9 +1,9 @@
-package com.github.easylog.autoconfigure;
+package com.github.easylog.configuration;
 
 
 import com.github.easylog.aop.EasyLogAspect;
-import com.github.easylog.api.ILogRecordService;
-import com.github.easylog.api.IOperatorService;
+import com.github.easylog.service.ILogRecordService;
+import com.github.easylog.service.IOperatorService;
 import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.function.ParseFunction;
 import com.github.easylog.function.ParseFunctionFactory;
@@ -29,7 +29,7 @@ import org.springframework.context.annotation.Role;
  * <ul>
  *     <li>Template parsing infrastructure ({@link com.github.easylog.function.EasyLogParser}) and the function registry.</li>
  *     <li>Default operator/provider beans that can be overridden by user beans.</li>
- *     <li>Log storage selection：in-memory log printing by default; override via {@link com.github.easylog.api.ILogRecordService}.</li>
+ *     <li>Log storage selection：in-memory log printing by default; override via {@link com.github.easylog.service.ILogRecordService}.</li>
  *     <li>AOP aspect that captures method invocations and renders operation logs.</li>
  * </ul>
  * All beans are defined with {@code @ConditionalOnMissingBean} so business projects can provide their own implementations
