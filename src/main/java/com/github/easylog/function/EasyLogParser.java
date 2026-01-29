@@ -52,12 +52,26 @@ public class EasyLogParser implements BeanFactoryAware {
                                                 Class<?> targetClass,
                                                 String errMsg,
                                                 Object result) {
+        return processAfterExec(expressTemplate, beforeCache, method, args, targetClass, errMsg, result, null);
+    }
+
+    /**
+     * After method execution: render all templates with local variables from EasyLogContext.
+     */
+    public Map<String, String> processAfterExec(List<String> expressTemplate,
+                                                Map<String, String> beforeCache,
+                                                Method method,
+                                                Object[] args,
+                                                Class<?> targetClass,
+                                                String errMsg,
+                                                Object result,
+                                                Map<String, Object> localVars) {
         HashMap<String, String> map = new HashMap<>();
         if (CollectionUtils.isEmpty(expressTemplate)) {
             return map;
         }
         AnnotatedElementKey elementKey = new AnnotatedElementKey(method, targetClass);
-        EvaluationContext ctx = cachedExpressionEvaluator.createEvaluationContext(method, args, beanFactory, errMsg, result);
+        EvaluationContext ctx = cachedExpressionEvaluator.createEvaluationContext(method, args, beanFactory, errMsg, result, localVars);
         for (String template : expressTemplate) {
             String resolved = resolveTemplate(template, elementKey, ctx, beforeCache);
             map.put(template, resolved);

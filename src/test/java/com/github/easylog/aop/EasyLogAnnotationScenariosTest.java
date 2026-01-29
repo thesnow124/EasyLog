@@ -5,6 +5,7 @@ import com.github.easylog.annotation.EasyLogs;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
 import com.github.easylog.compare.FieldInfo;
+import com.github.easylog.context.EasyLogContext;
 import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.function.ParseFunction;
 import com.github.easylog.function.ParseFunctionFactory;
@@ -162,7 +163,7 @@ class EasyLogAnnotationScenariosTest {
 
             EasyLogInfo info = singleLog();
             assertFalse(info.getSuccess());
-            assertEquals("fail boom", info.getContent());
+            assertEquals("fail boom ctx v-B-9", info.getContent());
             assertEquals("boom", info.getErrorMsg());
             assertEquals("default-op", info.getOperator());
             assertEquals("default-plat", info.getPlatform());
@@ -186,6 +187,20 @@ class EasyLogAnnotationScenariosTest {
             assertTrue(fields.get(0).getFieldName().contains("age"));
             assertEquals("1", fields.get(0).getOldFieldVal());
             assertEquals("2", fields.get(0).getNewFieldVal());
+        }
+    }
+
+    @Nested
+    @DisplayName("Context Vars")
+    class ContextVars {
+        @Test
+        void allows_context_variables_to_override_params() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-300");
+
+            scenarioService.withContext(request);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("ctx v-B-300 biz B-999", info.getContent());
         }
     }
 
@@ -315,10 +330,11 @@ class EasyLogAnnotationScenariosTest {
                 type = "DELETE",
                 bizNo = "{{#request.bizNo}}",
                 success = "ok",
-                fail = "fail ${}",
-                failParamList = {"{{#_errMsg}}"}
+                fail = "fail ${} ctx ${}",
+                failParamList = {"{{#_errMsg}}", "{{#ctxFail}}"}
         )
         public void fail(ScenarioRequest request) {
+            EasyLogContext.put("ctxFail", "v-" + request.getBizNo());
             throw new IllegalStateException("boom");
         }
 
@@ -358,6 +374,18 @@ class EasyLogAnnotationScenariosTest {
         )
         public void updateAddress(ScenarioRequest request) {
             store.put(request.getBizNo(), request.getAddress());
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                success = "ctx {{#ctxVar}} biz {{#request.bizNo}}"
+        )
+        public void withContext(ScenarioRequest request) {
+            EasyLogContext.put("ctxVar", "v-" + request.getBizNo());
+            ScenarioRequest shadow = ScenarioRequest.base().withBizNo("B-999");
+            EasyLogContext.put("request", shadow);
         }
 
         @EasyLogs({

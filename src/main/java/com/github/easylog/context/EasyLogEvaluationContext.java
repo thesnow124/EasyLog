@@ -15,11 +15,24 @@ import java.util.Map;
 public class EasyLogEvaluationContext extends MethodBasedEvaluationContext {
 
     public EasyLogEvaluationContext(Method method, Object[] arguments, ParameterNameDiscoverer parameterNameDiscoverer) {
+        this(method, arguments, parameterNameDiscoverer, null);
+    }
+
+    public EasyLogEvaluationContext(Method method,
+                                    Object[] arguments,
+                                    ParameterNameDiscoverer parameterNameDiscoverer,
+                                    Map<String, Object> localVars) {
         super(null, method, arguments, parameterNameDiscoverer);
-        // variables from EasyLogContext (top-most)
-        Map<String, Object> vars = EasyLogContext.getVariables();
-        for (Map.Entry<String, Object> e : vars.entrySet()) {
-            super.setVariable(e.getKey(), e.getValue());
+        Map<String, Object> vars = localVars != null ? localVars : EasyLogContext.getVariables();
+        if (vars.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Object> entry : vars.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || isReservedVariable(key)) {
+                continue;
+            }
+            super.setVariable(key, entry.getValue());
         }
     }
 
@@ -32,5 +45,9 @@ public class EasyLogEvaluationContext extends MethodBasedEvaluationContext {
     public void putResult(String errMsg, Object result) {
         super.setVariable(EasyLogConsts.ERR_MSG, errMsg);
         super.setVariable(EasyLogConsts.RESULT, result);
+    }
+
+    private boolean isReservedVariable(String key) {
+        return EasyLogConsts.RESULT.equals(key) || EasyLogConsts.ERR_MSG.equals(key);
     }
 }

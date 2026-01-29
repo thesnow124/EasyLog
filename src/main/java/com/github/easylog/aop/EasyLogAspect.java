@@ -109,6 +109,7 @@ public class EasyLogAspect {
         }
 
         // 方法逻辑：执行业务方法并捕获结果/异常；使用上下文栈隔离嵌套调用
+        Map<String, Object> localVars = null;
         try {
             EasyLogContext.push();
             Object result = joinPoint.proceed();
@@ -116,15 +117,18 @@ public class EasyLogAspect {
         } catch (Throwable e) {
             executeResult.exception(e);
         } finally {
-            EasyLogContext.pop();
+            localVars = EasyLogContext.pop();
             EasyLogContext.clearIfEmpty();
+        }
+        if (localVars == null) {
+            localVars = new HashMap<>();
         }
 
         // 方法后逻辑：渲染模板 -> 生成日志 -> 落地
         try {
             Map<String, String> templateMap = easyLogParser.processAfterExec(
                     expressTemplateList, customFunctionExecResultMap, method, args, targetClass,
-                    executeResult.getErrMsg(), executeResult.getResult());
+                    executeResult.getErrMsg(), executeResult.getResult(), localVars);
 
             List<EasyLogInfo> easyLogInfos = EasyLogAspectHelper.createEasyLogInfo(
                     templateMap, easyLogOpsList, executeResult, operatorService);
