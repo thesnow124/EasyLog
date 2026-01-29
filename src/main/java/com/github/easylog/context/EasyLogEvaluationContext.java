@@ -10,6 +10,7 @@ import java.util.Map;
 
 /**
  * SpEL 解析上下文：包含方法参数、结果/错误信息与 EasyLogContext 中的自定义变量。
+ * @author gaoshuanglong
  */
 public class EasyLogEvaluationContext extends MethodBasedEvaluationContext {
 
@@ -17,10 +18,8 @@ public class EasyLogEvaluationContext extends MethodBasedEvaluationContext {
         super(null, method, arguments, parameterNameDiscoverer);
         // variables from EasyLogContext (top-most)
         Map<String, Object> vars = EasyLogContext.getVariables();
-        if (vars != null) {
-            for (Map.Entry<String, Object> e : vars.entrySet()) {
-                super.setVariable(e.getKey(), e.getValue());
-            }
+        for (Map.Entry<String, Object> e : vars.entrySet()) {
+            super.setVariable(e.getKey(), e.getValue());
         }
     }
 

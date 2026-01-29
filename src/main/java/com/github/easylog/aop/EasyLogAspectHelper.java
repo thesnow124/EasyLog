@@ -9,12 +9,12 @@ import com.github.easylog.compare.FieldInfo;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -81,7 +81,9 @@ final class EasyLogAspectHelper {
         Map<String, Object> requestParams = new HashMap<>(16);
         if (paramNames == null) {
             paramNames = new String[paramValues == null ? 0 : paramValues.length];
-            for (int i = 0; i < paramNames.length; i++) paramNames[i] = "arg" + i;
+            for (int i = 0; i < paramNames.length; i++) {
+                paramNames[i] = "arg" + i;
+            }
         }
         for (int i = 0; i < paramNames.length; i++) {
             Object value = i < paramValues.length ? paramValues[i] : null;

@@ -9,7 +9,6 @@ import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
@@ -21,6 +20,7 @@ import org.springframework.aop.support.AopUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,6 +40,7 @@ import java.util.stream.Collectors;
  *     <li>在方法执行后渲染模板（成功/失败、SpEL、自定义函数、占位符），构造 {@link EasyLogInfo} 并交给存储层。</li>
  * </ol>
  * 任何解析/存储异常都被吞掉以避免影响业务主流程。
+ * @author gaoshuanglong
  */
 @Aspect
 @Slf4j

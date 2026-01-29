@@ -5,10 +5,10 @@ import com.github.easylog.api.IOperatorService;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
-import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
@@ -120,7 +120,9 @@ class EasyLogAspectHelperTest {
     @Test
     void buildRequestParamAndExtractClientIp() {
         MultipartFile file = new SimpleMultipartFile("file", "note.txt", "data".getBytes(StandardCharsets.UTF_8));
-        HttpServletRequest request = requestWithHeaders(Map.of("X-Forwarded-For", "1.1.1.1, 2.2.2.2"), "3.3.3.3");
+        Map<String, String> forwarded = new HashMap<>();
+        forwarded.put("X-Forwarded-For", "1.1.1.1, 2.2.2.2");
+        HttpServletRequest request = requestWithHeaders(forwarded, "3.3.3.3");
         Map<String, Object> params = EasyLogAspectHelper.buildRequestParam(
                 new String[]{"file", "req", "count"},
                 new Object[]{file, request, 2});
@@ -130,7 +132,9 @@ class EasyLogAspectHelperTest {
         assertEquals(2, params.get("count"));
 
         assertEquals("1.1.1.1", EasyLogAspectHelper.extractClientIp(request));
-        HttpServletRequest realIp = requestWithHeaders(Map.of("X-Real-IP", "9.9.9.9"), "3.3.3.3");
+        Map<String, String> realIpHeader = new HashMap<>();
+        realIpHeader.put("X-Real-IP", "9.9.9.9");
+        HttpServletRequest realIp = requestWithHeaders(realIpHeader, "3.3.3.3");
         assertEquals("9.9.9.9", EasyLogAspectHelper.extractClientIp(realIp));
         HttpServletRequest fallback = requestWithHeaders(Collections.emptyMap(), "7.7.7.7");
         assertEquals("7.7.7.7", EasyLogAspectHelper.extractClientIp(fallback));
@@ -184,11 +188,10 @@ class EasyLogAspectHelperTest {
         ops.setSuccess("successKey");
         ops.setCondition("condKey");
 
-        Map<String, String> templateMap = Map.of(
-                "bizKey", "BIZ-1",
-                "successKey", "success-msg",
-                "condKey", "false"
-        );
+        Map<String, String> templateMap = new HashMap<>();
+        templateMap.put("bizKey", "BIZ-1");
+        templateMap.put("successKey", "success-msg");
+        templateMap.put("condKey", "false");
 
         List<EasyLogInfo> infos = EasyLogAspectHelper.createEasyLogInfo(
                 templateMap, Collections.singletonList(ops), new MethodExecuteResult(true), new FixedOperatorService());

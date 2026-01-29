@@ -105,7 +105,7 @@ public class EasyLogParser implements BeanFactoryAware {
                                    Map<String, String> beforeCache) {
         // step1: replace function blocks（处理 {funcName{...}} 占位，优先用前置缓存）
         Matcher funcMatcher = FUNC_BLOCK.matcher(template);
-        StringBuilder funcBuf = new StringBuilder();
+        StringBuffer funcBuf = new StringBuffer();
         boolean funcMatched = false;
         while (funcMatcher.find()) {
             funcMatched = true;
@@ -123,7 +123,7 @@ public class EasyLogParser implements BeanFactoryAware {
 
         // step2: replace SpEL blocks {{ ... }}（处理纯 SpEL 占位）
         Matcher spelMatcher = SPEL_BLOCK.matcher(afterFunction);
-        StringBuilder spelBuf = new StringBuilder();
+        StringBuffer spelBuf = new StringBuffer();
         boolean spelMatched = false;
         while (spelMatcher.find()) {
             spelMatched = true;

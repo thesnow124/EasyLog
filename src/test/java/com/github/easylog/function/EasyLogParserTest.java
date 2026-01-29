@@ -11,7 +11,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EasyLogParserTest {
 
@@ -109,7 +108,7 @@ class EasyLogParserTest {
 
         Method method = Target.class.getDeclaredMethod("work", String.class, String.class);
         Map<String, String> map = parser.processAfterExec(
-                Arrays.asList("#code"), Map.of(), method, new Object[]{"x", "y"}, Target.class, null, null);
+                Arrays.asList("#code"), java.util.Collections.<String, String>emptyMap(), method, new Object[]{"x", "y"}, Target.class, null, null);
         assertEquals("y", map.get("#code"));
     }
 }

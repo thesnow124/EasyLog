@@ -2,7 +2,6 @@ package com.github.easylog.compare;
 
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.javers.core.Javers;
 import org.javers.core.JaversBuilder;
 import org.javers.core.diff.Change;
@@ -22,15 +21,10 @@ import org.javers.core.diff.changetype.map.EntryRemoved;
 import org.javers.core.diff.changetype.map.EntryValueChange;
 import org.javers.core.diff.changetype.map.MapChange;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.regex.Pattern;
 
 /**
  * 使用 JaVers 对 JSON 对象进行差异对比，输出字段变更列表。
@@ -38,7 +32,7 @@ import java.util.regex.Pattern;
  * 特性：
  * <ul>
  *     <li>忽略 List 顺序（SIMPLE 算法），便于对比表单类 JSON。</li>
- *     <li>自动将日期/科学计数等值转为可读字符串，避免展示 “1970-01-01” 等默认值。</li>
+ *     <li>保持原始值（字符串化）用于展示与存储。</li>
  *     <li>非 JSON 输入时退化为简单的旧/新值记录。</li>
  * </ul>
  * @author gaoshuanglong
@@ -49,12 +43,6 @@ public class Equator {
     private static final Javers JAVERS_IGNORE_LIST_ORDER = JaversBuilder.javers()
             .withListCompareAlgorithm(ListCompareAlgorithm.SIMPLE)
             .build();
-
-    private static final DateTimeFormatter OUTPUT_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
-    private static final Pattern PATTERN_WITH_SECONDS = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}$");
-    private static final DateTimeFormatter FORMATTER_WITH_SECONDS = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
-    private static final Pattern PATTERN_WITHOUT_SECONDS = Pattern.compile("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$");
-    private static final DateTimeFormatter FORMATTER_WITHOUT_SECONDS = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
 
     public static List<FieldInfo> getDiffField(String oldBean, String newBean) {
         // 1) 空输入直接返回空
@@ -84,16 +72,16 @@ public class Equator {
                 ValueChange vc = (ValueChange) change;
                 FieldInfo f = new FieldInfo();
                 f.setFieldName(vc.getPropertyNameWithPath());
-                f.setOldFieldVal(formatValue(vc.getLeft()));
-                f.setNewFieldVal(formatValue(vc.getRight()));
+                f.setOldFieldVal(stringValue(vc.getLeft()));
+                f.setNewFieldVal(stringValue(vc.getRight()));
                 list.add(f);
             } else if (change instanceof ReferenceChange) {
                 // 引用对象变更（取左右对象，若不存在用 GlobalId）
                 ReferenceChange rc = (ReferenceChange) change;
                 FieldInfo f = new FieldInfo();
                 f.setFieldName(rc.getPropertyNameWithPath());
-                f.setOldFieldVal(formatValue(rc.getLeftObject().orElse(rc.getLeft())));
-                f.setNewFieldVal(formatValue(rc.getRightObject().orElse(rc.getRight())));
+                f.setOldFieldVal(stringValue(rc.getLeftObject().orElse(rc.getLeft())));
+                f.setNewFieldVal(stringValue(rc.getRightObject().orElse(rc.getRight())));
                 list.add(f);
             } else if (change instanceof MapChange) {
                 // Map 键值变化：新增/删除/值变更
@@ -101,21 +89,21 @@ public class Equator {
                 String base = mc.getPropertyNameWithPath();
                 for (EntryChange ec : mc.getEntryChanges()) {
                     FieldInfo f = new FieldInfo();
-                    f.setFieldName(base + "[" + formatValue(ec.getKey()) + "]");
+                    f.setFieldName(base + "[" + stringValue(ec.getKey()) + "]");
                     if (ec instanceof EntryAdded) {
                         f.setOldFieldVal("");
-                        f.setNewFieldVal(formatValue(((EntryAdded) ec).getValue()));
+                        f.setNewFieldVal(stringValue(((EntryAdded) ec).getValue()));
                     } else if (ec instanceof EntryRemoved) {
-                        f.setOldFieldVal(formatValue(((EntryRemoved) ec).getValue()));
+                        f.setOldFieldVal(stringValue(((EntryRemoved) ec).getValue()));
                         f.setNewFieldVal("");
                     } else if (ec instanceof EntryValueChange) {
                         EntryValueChange evc = (EntryValueChange) ec;
-                        f.setOldFieldVal(formatValue(evc.getLeftValue()));
-                        f.setNewFieldVal(formatValue(evc.getRightValue()));
+                        f.setOldFieldVal(stringValue(evc.getLeftValue()));
+                        f.setNewFieldVal(stringValue(evc.getRightValue()));
                     } else {
                         // 未知场景兜底
-                        f.setOldFieldVal(formatValue(mc.getLeft()));
-                        f.setNewFieldVal(formatValue(mc.getRight()));
+                        f.setOldFieldVal(stringValue(mc.getLeft()));
+                        f.setNewFieldVal(stringValue(mc.getRight()));
                     }
                     list.add(f);
                 }
@@ -127,13 +115,13 @@ public class Equator {
                     FieldInfo f = new FieldInfo();
                     f.setFieldName(appendIndex(base, add.getIndex(), "+"));
                     f.setOldFieldVal("");
-                    f.setNewFieldVal(formatValue(add.getAddedValue()));
+                    f.setNewFieldVal(stringValue(add.getAddedValue()));
                     list.add(f);
                 }
                 for (ValueRemoved rem : cc.getValueRemovedChanges()) {
                     FieldInfo f = new FieldInfo();
                     f.setFieldName(appendIndex(base, rem.getIndex(), "-"));
-                    f.setOldFieldVal(formatValue(rem.getRemovedValue()));
+                    f.setOldFieldVal(stringValue(rem.getRemovedValue()));
                     f.setNewFieldVal("");
                     list.add(f);
                 }
@@ -142,8 +130,8 @@ public class Equator {
                         ElementValueChange evc = (ElementValueChange) elementChange;
                         FieldInfo f = new FieldInfo();
                         f.setFieldName(appendIndex(base, evc.getIndex(), null));
-                        f.setOldFieldVal(formatValue(evc.getLeftValue()));
-                        f.setNewFieldVal(formatValue(evc.getRightValue()));
+                        f.setOldFieldVal(stringValue(evc.getLeftValue()));
+                        f.setNewFieldVal(stringValue(evc.getRightValue()));
                         list.add(f);
                     }
                 }
@@ -152,8 +140,8 @@ public class Equator {
                 PropertyChange pc = (PropertyChange) change;
                 FieldInfo f = new FieldInfo();
                 f.setFieldName(pc.getPropertyNameWithPath());
-                f.setOldFieldVal(formatValue(pc.getLeft()));
-                f.setNewFieldVal(formatValue(pc.getRight()));
+                f.setOldFieldVal(stringValue(pc.getLeft()));
+                f.setNewFieldVal(stringValue(pc.getRight()));
                 list.add(f);
             }
         }
@@ -190,27 +178,7 @@ public class Equator {
         return s;
     }
 
-    private static String formatValue(Object value) {
-        if (value == null) return "";
-        String str = String.valueOf(value);
-        if (StringUtils.isEmpty(str)) return "";
-        if ("1970-01-01T00:00:01".equals(str) || "1970-01-01".equals(str)) return "";
-        try {
-            if (PATTERN_WITH_SECONDS.matcher(str).matches()) {
-                LocalDateTime dateTime = LocalDateTime.parse(str, FORMATTER_WITH_SECONDS);
-                return dateTime.format(OUTPUT_FORMATTER);
-            } else if (PATTERN_WITHOUT_SECONDS.matcher(str).matches()) {
-                LocalDateTime dateTime = LocalDateTime.parse(str, FORMATTER_WITHOUT_SECONDS);
-                return dateTime.format(OUTPUT_FORMATTER);
-            }
-        } catch (Exception ignored) {}
-
-        try {
-            if (str.contains(".") || str.contains("E") || str.contains("e")) {
-                BigDecimal bd = new BigDecimal(str);
-                return bd.stripTrailingZeros().toPlainString();
-            }
-        } catch (NumberFormatException ignored) {}
-        return str;
+    private static String stringValue(Object value) {
+        return value == null ? "" : String.valueOf(value);
     }
 }

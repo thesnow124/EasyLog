@@ -156,23 +156,5 @@ public class PlaceholderResolver {
         return resolveByRule(content, properties::getProperty);
     }
 
-//    /**
-//     * 根据对象中字段路径(即类似js访问对象属性值)替换模板中的占位符 <br/><br/>
-//     * 如 content = product:${id}:detail:${detail.id} <br/>
-//     * obj = Product.builder().id(1).detail(Detail.builder().id(2).build()).build(); <br/>
-//     * 经过解析返回 product:1:detail:2 <br/>
-//     *
-//     * @param content 要解析的内容
-//     * @param obj     填充解析内容的对象(如果是基本类型，则所有占位符替换为相同的值)
-//     * @return
-//     */
-//    @SuppressWarnings("unchecked")
-//    public String resolveByObject(String content, final Object obj) {
-//        if (obj instanceof Map) {
-//            return resolveByMap(content, (Map<String, Object>) obj);
-//        }
-//        return resolveByRule(content, placeholderValue -> String.valueOf(ReflectionUtils.getValueByFieldPath(obj, placeholderValue)));
-//    }
-
 
 }
