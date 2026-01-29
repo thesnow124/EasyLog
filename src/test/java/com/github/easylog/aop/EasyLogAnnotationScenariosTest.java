@@ -1,0 +1,561 @@
+package com.github.easylog.aop;
+
+import com.github.easylog.annotation.EasyLog;
+import com.github.easylog.annotation.EasyLogs;
+import com.github.easylog.api.ILogRecordService;
+import com.github.easylog.api.IOperatorService;
+import com.github.easylog.compare.FieldInfo;
+import com.github.easylog.function.EasyLogParser;
+import com.github.easylog.function.ParseFunction;
+import com.github.easylog.function.ParseFunctionFactory;
+import com.github.easylog.model.EasyLogInfo;
+import com.github.easylog.util.PlaceholderResolver;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringBootConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.EnableAspectJAutoProxy;
+import org.springframework.test.context.TestExecutionListeners;
+import org.springframework.test.context.TestExecutionListeners.MergeMode;
+import org.springframework.test.context.support.DependencyInjectionTestExecutionListener;
+import org.springframework.test.context.support.DirtiesContextTestExecutionListener;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+@SpringBootTest(classes = EasyLogAnnotationScenariosTest.TestConfig.class)
+@TestExecutionListeners(
+        listeners = {
+                DependencyInjectionTestExecutionListener.class,
+                DirtiesContextTestExecutionListener.class
+        },
+        mergeMode = MergeMode.REPLACE_DEFAULTS
+)
+class EasyLogAnnotationScenariosTest {
+
+    @Autowired
+    ScenarioService scenarioService;
+    @Autowired
+    CapturingLogRecordService logRecordService;
+    @Autowired
+    ScenarioStore scenarioStore;
+
+    @BeforeEach
+    void reset() {
+        logRecordService.clear();
+        scenarioStore.clear();
+    }
+
+    @Nested
+    @DisplayName("Basic SpEL")
+    class BasicSpel {
+        @Test
+        void renders_operator_platform_bizno_and_result() {
+            ScenarioRequest request = ScenarioRequest.base()
+                    .withOperator("bob")
+                    .withBizNo("B-100")
+                    .withPlatform("mobile")
+                    .withAddress("road-1");
+
+            String result = scenarioService.basic(request);
+            assertEquals("ok", result);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("B-100", info.getBizNo());
+            assertEquals("hello bob at road-1 result ok", info.getContent());
+            assertEquals("user", info.getModule());
+            assertEquals("UPDATE", info.getType());
+            assertEquals("bob", info.getOperator());
+            assertEquals("mobile", info.getPlatform());
+            assertTrue(info.getSuccess());
+        }
+    }
+
+    @Nested
+    @DisplayName("Placeholder Params")
+    class PlaceholderParams {
+        @Test
+        void resolves_placeholder_params_with_address() {
+            ScenarioRequest request = ScenarioRequest.base()
+                    .withOperator("alice")
+                    .withAddress("street-9");
+
+            scenarioService.placeholder(request);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("create alice at street-9", info.getContent());
+            assertEquals("B-1", info.getBizNo());
+        }
+    }
+
+    @Nested
+    @DisplayName("Functions and Beans")
+    class FunctionsAndBeans {
+        @Test
+        void resolves_custom_function() {
+            ScenarioRequest request = ScenarioRequest.base().withOperator("alice");
+
+            scenarioService.upper(request);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("upper ALICE", info.getContent());
+        }
+
+        @Test
+        void uses_before_function_value() {
+            ScenarioRequest request = ScenarioRequest.base()
+                    .withBizNo("B-200")
+                    .withAddress("new-addr");
+            scenarioStore.put("B-200", "old-addr");
+
+            scenarioService.updateAddress(request);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("old old-addr new new-addr", info.getContent());
+            assertEquals("new-addr", scenarioStore.get("B-200"));
+        }
+
+        @Test
+        void resolves_bean_method_call() {
+            ScenarioRequest request = ScenarioRequest.base().withLabelId("L-1");
+
+            scenarioService.beanCall(request);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("label label-L-1", info.getContent());
+        }
+    }
+
+    @Nested
+    @DisplayName("Conditions and Failures")
+    class ConditionsAndFailures {
+        @Test
+        void skips_when_condition_false() {
+            ScenarioRequest request = ScenarioRequest.base().withEnabled(false);
+
+            scenarioService.conditional(request);
+
+            assertTrue(logRecordService.snapshot().isEmpty());
+        }
+
+        @Test
+        void uses_fail_template_and_default_operator_platform() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-9");
+
+            IllegalStateException ex = assertThrows(IllegalStateException.class, () -> scenarioService.fail(request));
+            assertEquals("boom", ex.getMessage());
+
+            EasyLogInfo info = singleLog();
+            assertFalse(info.getSuccess());
+            assertEquals("fail boom", info.getContent());
+            assertEquals("boom", info.getErrorMsg());
+            assertEquals("default-op", info.getOperator());
+            assertEquals("default-plat", info.getPlatform());
+        }
+    }
+
+    @Nested
+    @DisplayName("Detail Diff")
+    class DetailDiff {
+        @Test
+        void builds_field_info_list_from_detail_diff() {
+            ScenarioRequest request = ScenarioRequest.base()
+                    .withOldNew("{\"age\":1}", "{\"age\":2}");
+
+            scenarioService.diff(request);
+
+            EasyLogInfo info = singleLog();
+            assertNotNull(info.getDetail());
+            List<FieldInfo> fields = info.getFieldInfoList();
+            assertEquals(1, fields.size());
+            assertTrue(fields.get(0).getFieldName().contains("age"));
+            assertEquals("1", fields.get(0).getOldFieldVal());
+            assertEquals("2", fields.get(0).getNewFieldVal());
+        }
+    }
+
+    @Nested
+    @DisplayName("Repeatable Annotations")
+    class RepeatableAnnotations {
+        @Test
+        void records_multiple_logs() {
+            ScenarioRequest request = ScenarioRequest.base().withOperator("leo");
+
+            scenarioService.multi(request);
+
+            List<EasyLogInfo> logs = logRecordService.snapshot();
+            assertEquals(2, logs.size());
+            Set<String> modules = logs.stream().map(EasyLogInfo::getModule).collect(Collectors.toSet());
+            assertTrue(modules.contains("user"));
+            assertTrue(modules.contains("audit"));
+            Set<String> contents = logs.stream().map(EasyLogInfo::getContent).collect(Collectors.toSet());
+            assertTrue(contents.contains("user-log"));
+            assertTrue(contents.contains("audit leo"));
+        }
+    }
+
+    private EasyLogInfo singleLog() {
+        List<EasyLogInfo> logs = logRecordService.snapshot();
+        assertEquals(1, logs.size());
+        return logs.get(0);
+    }
+
+    @SpringBootConfiguration
+    @EnableAspectJAutoProxy
+    static class TestConfig {
+        @Bean
+        ScenarioStore scenarioStore() {
+            return new ScenarioStore();
+        }
+
+        @Bean
+        ScenarioService scenarioService(ScenarioStore scenarioStore) {
+            return new ScenarioService(scenarioStore);
+        }
+
+        @Bean
+        LabelService labelService() {
+            return new LabelService();
+        }
+
+        @Bean
+        IOperatorService operatorService() {
+            return new FixedOperatorService();
+        }
+
+        @Bean
+        CapturingLogRecordService logRecordService() {
+            return new CapturingLogRecordService();
+        }
+
+        @Bean
+        ParseFunction upperFunction() {
+            return new UpperFunction();
+        }
+
+        @Bean
+        ParseFunction oldValueFunction(ScenarioStore scenarioStore) {
+            return new OldValueFunction(scenarioStore);
+        }
+
+        @Bean
+        ParseFunctionFactory parseFunctionFactory(List<ParseFunction> parseFunctions) {
+            return new ParseFunctionFactory(parseFunctions);
+        }
+
+        @Bean
+        EasyLogParser easyLogParser(ParseFunctionFactory parseFunctionFactory) {
+            return new EasyLogParser(parseFunctionFactory);
+        }
+
+        @Bean
+        EasyLogAspect easyLogAspect(ILogRecordService logRecordService,
+                                   IOperatorService operatorService,
+                                   EasyLogParser easyLogParser) {
+            return new EasyLogAspect(logRecordService, operatorService, easyLogParser, false);
+        }
+    }
+
+    static class ScenarioService {
+        private final ScenarioStore store;
+
+        ScenarioService(ScenarioStore store) {
+            this.store = store;
+        }
+
+        @EasyLog(
+                platform = "{{#request.platform}}",
+                operator = "{{#request.operator}}",
+                module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                success = "hello {{#request.operator}} at {{#request.address}} result {{#_result}}"
+        )
+        public String basic(ScenarioRequest request) {
+            return "ok";
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "CREATE",
+                bizNo = "#request.bizNo",
+                success = "create ${} at ${}",
+                successParamList = {"{{#request.operator}}", "{{#request.address}}"}
+        )
+        public void placeholder(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                success = "ok",
+                condition = "{{#request.enabled}}"
+        )
+        public void conditional(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "DELETE",
+                bizNo = "{{#request.bizNo}}",
+                success = "ok",
+                fail = "fail ${}",
+                failParamList = {"{{#_errMsg}}"}
+        )
+        public void fail(ScenarioRequest request) {
+            throw new IllegalStateException("boom");
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                detail = "[{{#request.oldJson}},{{#request.newJson}}]",
+                success = "diff"
+        )
+        public void diff(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "READ",
+                bizNo = "{{#request.bizNo}}",
+                success = "label {{@labelService.label(#request.labelId)}}"
+        )
+        public void beanCall(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "READ",
+                bizNo = "{{#request.bizNo}}",
+                success = "upper {upper{#request.operator}}"
+        )
+        public void upper(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                success = "old {oldValue{#request.bizNo}} new {{#request.address}}"
+        )
+        public void updateAddress(ScenarioRequest request) {
+            store.put(request.getBizNo(), request.getAddress());
+        }
+
+        @EasyLogs({
+                @EasyLog(
+                        module = "user",
+                        type = "CREATE",
+                        bizNo = "{{#request.bizNo}}",
+                        success = "user-log"
+                ),
+                @EasyLog(
+                        module = "audit",
+                        type = "TRACE",
+                        bizNo = "{{#request.bizNo}}",
+                        success = "audit {{#request.operator}}"
+                )
+        })
+        public void multi(ScenarioRequest request) {
+        }
+    }
+
+    static class ScenarioRequest {
+        private String operator;
+        private String bizNo;
+        private String platform;
+        private String address;
+        private boolean enabled = true;
+        private String oldJson;
+        private String newJson;
+        private String labelId;
+
+        static ScenarioRequest base() {
+            ScenarioRequest request = new ScenarioRequest();
+            request.operator = "alice";
+            request.bizNo = "B-1";
+            request.platform = "web";
+            request.address = "road-0";
+            request.labelId = "L-0";
+            request.oldJson = "{\"age\":1}";
+            request.newJson = "{\"age\":2}";
+            return request;
+        }
+
+        ScenarioRequest withOperator(String operator) {
+            this.operator = operator;
+            return this;
+        }
+
+        ScenarioRequest withBizNo(String bizNo) {
+            this.bizNo = bizNo;
+            return this;
+        }
+
+        ScenarioRequest withPlatform(String platform) {
+            this.platform = platform;
+            return this;
+        }
+
+        ScenarioRequest withAddress(String address) {
+            this.address = address;
+            return this;
+        }
+
+        ScenarioRequest withEnabled(boolean enabled) {
+            this.enabled = enabled;
+            return this;
+        }
+
+        ScenarioRequest withOldNew(String oldJson, String newJson) {
+            this.oldJson = oldJson;
+            this.newJson = newJson;
+            return this;
+        }
+
+        ScenarioRequest withLabelId(String labelId) {
+            this.labelId = labelId;
+            return this;
+        }
+
+        public String getOperator() {
+            return operator;
+        }
+
+        public String getBizNo() {
+            return bizNo;
+        }
+
+        public String getPlatform() {
+            return platform;
+        }
+
+        public String getAddress() {
+            return address;
+        }
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public String getOldJson() {
+            return oldJson;
+        }
+
+        public String getNewJson() {
+            return newJson;
+        }
+
+        public String getLabelId() {
+            return labelId;
+        }
+    }
+
+    static class ScenarioStore {
+        private final Map<String, String> values = new ConcurrentHashMap<>();
+
+        void put(String key, String value) {
+            values.put(key, value);
+        }
+
+        String get(String key) {
+            return values.get(key);
+        }
+
+        void clear() {
+            values.clear();
+        }
+    }
+
+    static class LabelService {
+        public String label(String id) {
+            return "label-" + id;
+        }
+    }
+
+    static class FixedOperatorService implements IOperatorService {
+        @Override
+        public String getOperator() {
+            return "default-op";
+        }
+
+        @Override
+        public String getPlatform() {
+            return "default-plat";
+        }
+    }
+
+    static class CapturingLogRecordService implements ILogRecordService {
+        private final CopyOnWriteArrayList<EasyLogInfo> logs = new CopyOnWriteArrayList<>();
+
+        @Override
+        public void record(EasyLogInfo easyLogInfo) {
+            String resolved = PlaceholderResolver.getDefaultResolver()
+                    .resolve(easyLogInfo.getContent(), easyLogInfo.getContentParam());
+            easyLogInfo.setContent(resolved);
+            logs.add(easyLogInfo);
+        }
+
+        void clear() {
+            logs.clear();
+        }
+
+        List<EasyLogInfo> snapshot() {
+            return new ArrayList<>(logs);
+        }
+    }
+
+    static class UpperFunction implements ParseFunction {
+        @Override
+        public String functionName() {
+            return "upper";
+        }
+
+        @Override
+        public String apply(String value) {
+            return value == null ? "" : value.toUpperCase();
+        }
+    }
+
+    static class OldValueFunction implements ParseFunction {
+        private final ScenarioStore store;
+
+        OldValueFunction(ScenarioStore store) {
+            this.store = store;
+        }
+
+        @Override
+        public String functionName() {
+            return "oldValue";
+        }
+
+        @Override
+        public String apply(String value) {
+            String oldValue = store.get(value);
+            return oldValue == null ? "" : oldValue;
+        }
+
+        @Override
+        public boolean executeBefore() {
+            return true;
+        }
+    }
+}

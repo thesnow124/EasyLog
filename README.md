@@ -47,7 +47,6 @@
 
 ```properties
 easylog.enable=true       # 是否启用（默认 true）
-easylog.store=log         # 落地方式：log | jdbc（默认 log）
 easylog.after-commit=false # 是否在事务提交后再落地（默认 false）
 ```
 
@@ -120,8 +119,6 @@ public void manyLog(String name) { ... }
   - `{{ @easyLogFunctions.userLabel(#p0) }}`
   - 旧值（前置执行）：`{{ @easyLogFunctions.loadOldJson(#id) }}`
   - 新值（后置执行，依赖结果）：`{{ @easyLogFunctions.buildNew(#_result) }}`
-- 后置执行标记（不依赖结果也要后置执行）：
-  - `{{ @easyLogPhase.after(@easyLogFunctions.loadNew(#id)) }}`
 - 变量上下文（在方法内设置临时变量供模板使用）：
   - 代码：`EasyLogContext.put("oldAddress", oldAddress);`
   - 模板：`"从 {{#oldAddress}} 改为 {{#_result.address}}"`
@@ -140,7 +137,7 @@ public void manyLog(String name) { ... }
 - `EasyLogAutoConfiguration` 受 `easylog.enable` 控制（默认开启）
 - 若业务侧提供同名 Bean，则自动替换默认实现：
   - `IOperatorService`（操作者/平台）
-  - `ILogRecordService`（日志落地），并可通过 `easylog.store=jdbc|log` 切换默认实现
+  - `ILogRecordService`（日志落地），业务侧实现即可覆盖默认日志输出
 
 ## 迁移说明
 - 自定义函数 DSL 删除：原 `{funcName{SpEL}}` 改为 `{{ @beanName.method(SpEL) }}`
@@ -160,8 +157,6 @@ chmod +x mvnw
 ./mvnw clean test
 ```
 
-- 设定 `easylog.store=jdbc` 且业务引入了 `DataSource` 时启用 JDBC 版落库实现；否则默认打印日志。
-- 建表脚本见：`docs/sql/easy_log_record.sql`
 - 若需自定义存储（DB/ES/MQ），实现并注入 `ILogRecordService` 即可覆盖默认行为。
 
 ---

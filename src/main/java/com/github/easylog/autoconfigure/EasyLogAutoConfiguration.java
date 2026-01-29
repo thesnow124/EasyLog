@@ -9,13 +9,11 @@ import com.github.easylog.function.ParseFunction;
 import com.github.easylog.function.ParseFunctionFactory;
 import com.github.easylog.support.DefaultLogRecordServiceImpl;
 import com.github.easylog.support.DefaultOperatorServiceImpl;
-import com.github.easylog.support.JdbcLogRecordServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -23,7 +21,6 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Role;
 
-import javax.sql.DataSource;
 
 /**
  * Auto-configuration entry for the EasyLog SDK.
@@ -32,8 +29,7 @@ import javax.sql.DataSource;
  * <ul>
  *     <li>Template parsing infrastructure ({@link com.github.easylog.function.EasyLogParser}) and the function registry.</li>
  *     <li>Default operator/provider beans that can be overridden by user beans.</li>
- *     <li>Log storage selection：in-memory log printing by default, JDBC storage when a {@link javax.sql.DataSource}
- *     is present and {@code easylog.store=jdbc}.</li>
+ *     <li>Log storage selection：in-memory log printing by default; override via {@link com.github.easylog.api.ILogRecordService}.</li>
  *     <li>AOP aspect that captures method invocations and renders operation logs.</li>
  * </ul>
  * All beans are defined with {@code @ConditionalOnMissingBean} so business projects can provide their own implementations
@@ -60,25 +56,11 @@ public class EasyLogAutoConfiguration {
         return new EasyLogParser(parseFunctionFactory);
     }
 
-    @Bean(name = "easyLogPhase")
-    public com.github.easylog.context.EasyLogPhase easyLogPhase() {
-        return new com.github.easylog.context.EasyLogPhase();
-    }
-
     @Bean
     @ConditionalOnMissingBean(IOperatorService.class)
     @Role(BeanDefinition.ROLE_APPLICATION)
     public IOperatorService operatorGetService() {
         return new DefaultOperatorServiceImpl(easyLogProperties);
-    }
-
-    @Bean
-    @ConditionalOnBean(DataSource.class)
-    @ConditionalOnProperty(prefix = "easylog", name = "store", havingValue = "jdbc")
-    @ConditionalOnMissingBean(ILogRecordService.class)
-    @Role(BeanDefinition.ROLE_APPLICATION)
-    public ILogRecordService jdbcRecordService(DataSource dataSource) {
-        return new JdbcLogRecordServiceImpl(dataSource);
     }
 
     @Bean

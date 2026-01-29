@@ -25,7 +25,7 @@ public class EasyLogProperties {
     private String platform;
 
     /**
-     * 日志落地方式：log | jdbc，默认 log
+     * 日志落地方式：log（默认）。如需其它方式请自定义 ILogRecordService。
      */
     private String store = "log";
 
