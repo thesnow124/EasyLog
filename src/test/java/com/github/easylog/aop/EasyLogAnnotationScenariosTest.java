@@ -172,17 +172,18 @@ class EasyLogAnnotationScenariosTest {
     }
 
     @Nested
-    @DisplayName("Detail Diff")
-    class DetailDiff {
+    @DisplayName("Before/After Diff")
+    class BeforeAfterDiff {
         @Test
-        void builds_field_info_list_from_detail_diff() {
+        void builds_field_info_list_from_before_after_diff() {
             ScenarioRequest request = ScenarioRequest.base()
                     .withOldNew("{\"age\":1}", "{\"age\":2}");
 
             scenarioService.diff(request);
 
             EasyLogInfo info = singleLog();
-            assertNotNull(info.getDetail());
+            assertEquals("{\"age\":1}", info.getBefore());
+            assertEquals("{\"age\":2}", info.getAfter());
             List<FieldInfo> fields = info.getFieldInfoList();
             assertEquals(1, fields.size());
             assertTrue(fields.get(0).getFieldName().contains("age"));
@@ -191,13 +192,14 @@ class EasyLogAnnotationScenariosTest {
         }
 
         @Test
-        void builds_field_info_list_from_detail_object_array() {
+        void builds_field_info_list_from_before_after_object() {
             ScenarioRequest request = ScenarioRequest.base().withBizNo("B-201");
 
             scenarioService.diffObject(request);
 
             EasyLogInfo info = singleLog();
-            assertNotNull(info.getDetail());
+            assertNotNull(info.getBefore());
+            assertNotNull(info.getAfter());
             List<FieldInfo> fields = info.getFieldInfoList();
             assertEquals(1, fields.size());
             assertTrue(fields.get(0).getFieldName().contains("age"));
@@ -358,7 +360,8 @@ class EasyLogAnnotationScenariosTest {
                 module = "user",
                 type = "UPDATE",
                 bizNo = "{{#request.bizNo}}",
-                detail = "[{{#request.oldJson}},{{#request.newJson}}]",
+                before = "{{#request.oldJson}}",
+                after = "{{#request.newJson}}",
                 success = "diff"
         )
         public void diff(ScenarioRequest request) {
@@ -368,7 +371,8 @@ class EasyLogAnnotationScenariosTest {
                 module = "user",
                 type = "UPDATE",
                 bizNo = "{{#request.bizNo}}",
-                detail = "{{T(java.util.Arrays).asList(#oldObj, #newObj)}}",
+                before = "{{#oldObj}}",
+                after = "{{#newObj}}",
                 success = "diff-obj"
         )
         public void diffObject(ScenarioRequest request) {

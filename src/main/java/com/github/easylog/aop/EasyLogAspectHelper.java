@@ -1,7 +1,5 @@
 package com.github.easylog.aop;
 
-import com.alibaba.fastjson2.JSON;
-import com.alibaba.fastjson2.JSONArray;
 import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.service.IOperatorService;
 import com.github.easylog.compare.Equator;
@@ -9,8 +7,6 @@ import com.github.easylog.compare.FieldInfo;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.util.CollectionUtils;
 import org.springframework.util.ObjectUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -28,7 +24,6 @@ import java.util.stream.Collectors;
 /**
  * 提取自 EasyLogAspect 的纯工具逻辑，保持原有实现不变。
  */
-@Slf4j
 final class EasyLogAspectHelper {
     private EasyLogAspectHelper() {}
 
@@ -46,7 +41,9 @@ final class EasyLogAspectHelper {
         easyLogOps.setOperator(easyLog.operator());
         easyLogOps.setBizNo(easyLog.bizNo());
         easyLogOps.setPlatform(easyLog.platform());
-        easyLogOps.setDetails(easyLog.detail());
+        easyLogOps.setBefore(easyLog.before());
+        easyLogOps.setAfter(easyLog.after());
+        easyLogOps.setExtra(easyLog.extra());
         easyLogOps.setCondition(easyLog.condition());
         return easyLogOps;
     }
@@ -59,7 +56,9 @@ final class EasyLogAspectHelper {
         for (EasyLogOps easyLogOps : easyLogOpsList) {
             set.addAll(java.util.Arrays.asList(
                     easyLogOps.getBizNo(),
-                    easyLogOps.getDetails(),
+                    easyLogOps.getBefore(),
+                    easyLogOps.getAfter(),
+                    easyLogOps.getExtra(),
                     easyLogOps.getOperator(),
                     easyLogOps.getPlatform(),
                     easyLogOps.getSuccess(),
@@ -151,7 +150,11 @@ final class EasyLogAspectHelper {
             easyLogInfo.setModule(easyLogOps.getModule());
             easyLogInfo.setType(easyLogOps.getType());
             easyLogInfo.setBizNo(templateMap.get(easyLogOps.getBizNo()));
-            easyLogInfo.setDetail(templateMap.get(easyLogOps.getDetails()));
+            String before = templateMap.get(easyLogOps.getBefore());
+            String after = templateMap.get(easyLogOps.getAfter());
+            easyLogInfo.setBefore(before);
+            easyLogInfo.setAfter(after);
+            easyLogInfo.setExtra(templateMap.get(easyLogOps.getExtra()));
             String contentKey = easyLogOps.getSuccess();
             String[] paramKeyList = easyLogOps.getSuccessParamList();
             if (!executeResult.isSuccess()) {
@@ -168,50 +171,17 @@ final class EasyLogAspectHelper {
                     })
                     .toArray(String[]::new);
             easyLogInfo.setContentParam(array);
-            // 差异详情：解析 JSON，生成字段级差异列表
-            easyLogInfo.setFieldInfoList(getFieldInfoList(easyLogInfo.getDetail()));
+            // 差异详情：根据 before/after 生成字段级差异列表
+            easyLogInfo.setFieldInfoList(getFieldInfoList(before, after));
             easyLogInfos.add(easyLogInfo);
         }
         return easyLogInfos;
     }
 
-    private static List<FieldInfo> getFieldInfoList(String detail) {
-        Object o;
-        try {
-            o = JSON.parse(detail);
-        } catch (Exception e) {
-            log.info("反序列化失败 detail=" + detail, e);
-            FieldInfo fieldDiff = new FieldInfo();
-            fieldDiff.setVal(detail);
-            return Collections.singletonList(fieldDiff);
+    private static List<FieldInfo> getFieldInfoList(String before, String after) {
+        if (ObjectUtils.isEmpty(before) && ObjectUtils.isEmpty(after)) {
+            return Collections.emptyList();
         }
-        // 支持 detail=[old,new,...] 形式的 JSON 数组，取第一个元素为旧值，最后一个元素为新值
-        if (o instanceof JSONArray) {
-            JSONArray array = (JSONArray) o;
-            if (CollectionUtils.isEmpty(array)) {
-                return Collections.emptyList();
-            }
-            String oldBean = toJsonString(array.get(0));
-            String newBean = array.size() > 1 ? toJsonString(array.get(array.size() - 1)) : null;
-            return Equator.getDiffField(oldBean, newBean);
-        } else {
-            FieldInfo fieldDiff = new FieldInfo();
-            fieldDiff.setVal(detail);
-            return Collections.singletonList(fieldDiff);
-        }
-    }
-
-    private static String toJsonString(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof String) {
-            return (String) value;
-        }
-        try {
-            return JSON.toJSONString(value);
-        } catch (Exception e) {
-            return String.valueOf(value);
-        }
+        return Equator.getDiffField(before, after);
     }
 }

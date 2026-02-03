@@ -133,9 +133,9 @@ public class PlaceholderResolver {
 
     /**
      * 替换模板中占位符内容，占位符的内容即为map key对应的值，key为占位符中的内容。<br/><br/>
-     * 如：content = product:${id}:detail:${did}<br/>
+     * 如：content = product:${id}:extra:${eid}<br/>
      * valueMap = id -> 1; pid -> 2<br/>
-     * 经过解析返回 product:1:detail:2<br/>
+     * 经过解析返回 product:1:extra:2<br/>
      *
      * @param content  模板内容。
      * @param valueMap 值映射

@@ -79,7 +79,9 @@ public class LogRecordServiceImpl implements ILogRecordService {
   type   = "UPDATE",
   success = "更新了用户信息：{{#userDto.name}}",
   bizNo   = "{{#userDto.id}}",
-  detail  = "{{#_result}}"   // 记录返回值，或使用 JSON 数组记录前后对比
+  before = "{{ @easyLogFunctions.loadOldJson(#userDto.id) }}",
+  after  = "{{#_result}}",
+  extra  = "备注：{{#userDto.remark}}"
 )
 public User update(UserDto userDto) { ... }
 ```
@@ -106,6 +108,9 @@ public void manyLog(String name) { ... }
 - 自定义函数 DSL：`{funcName{SpEL}}`
   - 实现 `ParseFunction` 并注册为 Spring Bean
   - 可通过 `executeBefore()` 在方法执行前获取旧值
+- 变更快照：
+  - `before`/`after` 用于字段差异对比
+  - `extra` 用于扩展信息（不参与 diff）
 - 内容占位符：`${}`
   - 用于 `success`/`fail` 文本中顺序占位；对应参数从 `successParamList`/`failParamList` 解析后按顺序替换
   - 示例：`success = "用户：${} 已被禁用，原因：${}"`
@@ -124,8 +129,8 @@ public void manyLog(String name) { ... }
   - 模板：`"从 {{#oldAddress}} 改为 {{#_result.address}}"`
 - 失败日志：
   - `fail = "操作失败：{{#_errMsg}}"`
-- 详情差异：
-  - `detail = "[{{ @easyLogFunctions.loadOldJson(#id) }}, {{ #_result }}]"`
+- 变更差异：
+  - `before = "{{ @easyLogFunctions.loadOldJson(#id) }}"`，`after = "{{ #_result }}"`
 - 条件记录：
   - `condition = "{{ #p0 != null }}"`
 - 文本占位与顺序参数：
@@ -145,6 +150,7 @@ public void manyLog(String name) { ... }
   - 例如：`jakarta.annotation.PostConstruct` → `javax.annotation.PostConstruct`
            `jakarta.servlet.http.HttpServletRequest` → `javax.servlet.http.HttpServletRequest`
 - 自定义函数 DSL 仍支持：`{funcName{SpEL}}`；也可使用 `{{ @beanName.method(SpEL) }}` 调用 Spring Bean
+- `detail` 已移除：请使用 `before`/`after` 生成字段差异，扩展信息放入 `extra`
 - Spring Boot 3.x 需要 Jakarta 版本，不与当前版本兼容
 
 ## 构建与测试

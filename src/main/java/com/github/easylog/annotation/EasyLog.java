@@ -67,9 +67,19 @@ public @interface EasyLog {
 
 
     /**
-     * 记录更详细的
+     * 变更前快照（用于字段差异对比）
      */
-    String detail() default "";
+    String before() default "";
+
+    /**
+     * 变更后快照（用于字段差异对比）
+     */
+    String after() default "";
+
+    /**
+     * 额外扩展信息（不参与字段差异对比）
+     */
+    String extra() default "";
 
     /**
      * 记录条件 默认 true

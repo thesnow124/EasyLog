@@ -103,9 +103,19 @@ public class EasyLogInfo {
 
 
 	/**
-	 * 详细
+	 * 变更前快照（用于字段差异对比）
 	 */
-	private String detail;
+	private String before;
+
+	/**
+	 * 变更后快照（用于字段差异对比）
+	 */
+	private String after;
+
+	/**
+	 * 额外扩展信息（不参与字段差异对比）
+	 */
+	private String extra;
 
 	/**
 	 * 详细的字段变更

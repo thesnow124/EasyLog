@@ -63,7 +63,8 @@ easy-log 选择 AOP 注解方式，在方法调用维度收集上下文并拼装
 - `bizNo`: 业务对象标识（如订单号、用户ID）
 - `success` / `fail`: 成功/失败模板（支持 `{{}}`、`${}`）
 - `successParamList` / `failParamList`: 文本 `${}` 的顺序参数键（模板解析后按顺序替换）
-- `detail`: 详情字符串；若为 JSON 数组字符串 `[oldJson, newJson]` 会生成字段差异
+- `before` / `after`: 变更前/后快照，用于生成字段差异
+- `extra`: 扩展信息（不参与差异对比）
 - `condition`: 记录条件（SpEL），为空视为记录
 
 ### 6.2 模板与表达式
@@ -78,7 +79,9 @@ easy-log 选择 AOP 注解方式，在方法调用维度收集上下文并拼装
   type   = "UPDATE",
   bizNo  = "{{#userDto.id}}",
   success= "更新了用户信息：{{#userDto.name}}",
-  detail = "{{#_result}}"
+  before = "{{ @easyLogFunctions.loadOldJson(#userDto.id) }}",
+  after  = "{{#_result}}",
+  extra  = "备注：{{#userDto.remark}}"
 )
 public User update(UserDto userDto) { ... }
 
@@ -119,7 +122,7 @@ public void manyLog(String name) { ... }
   - 基本信息：`operator`、`platform`、`operateTime`、`module`、`type`、`bizNo`
   - 请求上下文：`ip`、`url`、`httpMethod`、`classMethod`、`param`
   - 结果与异常：`success`、`result`、`errorMsg`、`stackTrace`、`executeTime`
-  - 文案与详情：`content`、`contentParam`、`detail`、`fieldInfoList`
+  - 文案与详情：`content`、`contentParam`、`before`、`after`、`extra`、`fieldInfoList`
 - 检索字段建议：`platform,module,type,bizNo,operator,operateTime`
 
 ## 11. 安全与合规
@@ -157,12 +160,13 @@ public void manyLog(String name) { ... }
 - 运行环境：JDK 8+ / Spring Boot 2.5.x（javax）
 - 若从 Boot 3/Jakarta 回退：`jakarta.*` → `javax.*`（如 `PostConstruct`、`HttpServletRequest`）
 - 自定义函数 DSL 仍保留：`{funcName{SpEL}}`；也可使用 `{{ @beanName.method(SpEL) }}` 调用 Spring Bean
+- `detail` 已移除：请使用 `before`/`after` 生成字段差异，扩展信息放入 `extra`
 
 ## 16. FAQ（节选）
 - Q：非 Web 项目能用吗？
   - A：可以。没有请求上下文时 `ip/url/httpMethod` 为空，不影响日志记录。
 - Q：如何在日志中输出“修改前/修改后”？
-  - A：`detail` 传入 `[oldJson,newJson]` 字符串，自动生成 `fieldInfoList`；或使用自定义函数查询旧值。
+  - A：通过 `before`/`after` 传入快照，自动生成 `fieldInfoList`；旧值可使用自定义函数前置获取。
 - Q：如何避免方法签名为记录日志而“加参”？
   - A：通过“前置函数”在切入点执行前计算所需值，模板中 `{func{#arg}}` 引用即可。
 

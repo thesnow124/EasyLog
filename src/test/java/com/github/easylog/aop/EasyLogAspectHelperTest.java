@@ -34,7 +34,9 @@ class EasyLogAspectHelperTest {
             successParamList = {"sp1"},
             fail = "fail",
             failParamList = {"fp1"},
-            detail = "detail",
+            before = "before",
+            after = "after",
+            extra = "extra",
             condition = "cond"
     )
     void annotatedMethod() {}
@@ -104,14 +106,18 @@ class EasyLogAspectHelperTest {
         assertEquals("biz", ops.getBizNo());
         assertEquals("success", ops.getSuccess());
         assertEquals("fail", ops.getFail());
-        assertEquals("detail", ops.getDetails());
+        assertEquals("before", ops.getBefore());
+        assertEquals("after", ops.getAfter());
+        assertEquals("extra", ops.getExtra());
         assertEquals("cond", ops.getCondition());
 
         List<String> templates = EasyLogAspectHelper.getExpressTemplate(Collections.singletonList(ops));
         assertTrue(templates.contains("biz"));
         assertTrue(templates.contains("success"));
         assertTrue(templates.contains("fail"));
-        assertTrue(templates.contains("detail"));
+        assertTrue(templates.contains("before"));
+        assertTrue(templates.contains("after"));
+        assertTrue(templates.contains("extra"));
         assertTrue(templates.contains("cond"));
         assertTrue(templates.contains("sp1"));
         assertTrue(templates.contains("fp1"));
@@ -144,7 +150,9 @@ class EasyLogAspectHelperTest {
     void createEasyLogInfoBuildsSuccessLog() {
         EasyLogOps ops = new EasyLogOps();
         ops.setBizNo("bizKey");
-        ops.setDetails("detailKey");
+        ops.setBefore("beforeKey");
+        ops.setAfter("afterKey");
+        ops.setExtra("extraKey");
         ops.setOperator("opKey");
         ops.setPlatform("platKey");
         ops.setSuccess("successKey");
@@ -157,7 +165,9 @@ class EasyLogAspectHelperTest {
 
         Map<String, String> templateMap = new HashMap<>();
         templateMap.put("bizKey", "BIZ-1");
-        templateMap.put("detailKey", "[{\"a\":1},{\"a\":2}]");
+        templateMap.put("beforeKey", "{\"a\":1}");
+        templateMap.put("afterKey", "{\"a\":2}");
+        templateMap.put("extraKey", "extra-info");
         templateMap.put("successKey", "success-msg");
         templateMap.put("param1", "P1");
         templateMap.put("condKey", "true");
@@ -176,6 +186,7 @@ class EasyLogAspectHelperTest {
         assertEquals("", info.getContentParam()[1]);
         assertEquals("fixed-op", info.getOperator());
         assertEquals("fixed-plat", info.getPlatform());
+        assertEquals("extra-info", info.getExtra());
         assertEquals("true", info.getCondition());
         assertNotNull(info.getFieldInfoList());
         assertFalse(info.getFieldInfoList().isEmpty());
@@ -199,16 +210,18 @@ class EasyLogAspectHelperTest {
     }
 
     @Test
-    void createEasyLogInfoUsesFailTemplateAndFallbackDetail() {
+    void createEasyLogInfoUsesFailTemplateAndDiffFromBeforeAfter() {
         EasyLogOps ops = new EasyLogOps();
         ops.setBizNo("bizKey");
-        ops.setDetails("detailKey");
+        ops.setBefore("beforeKey");
+        ops.setAfter("afterKey");
         ops.setFail("failKey");
         ops.setFailParamList(new String[]{"failParam"});
 
         Map<String, String> templateMap = new HashMap<>();
         templateMap.put("bizKey", "BIZ-1");
-        templateMap.put("detailKey", "not-json");
+        templateMap.put("beforeKey", "old");
+        templateMap.put("afterKey", "new");
         templateMap.put("failKey", "fail-msg");
         templateMap.put("failParam", "F1");
 
@@ -223,7 +236,8 @@ class EasyLogAspectHelperTest {
         assertEquals("fail-msg", info.getContent());
         assertEquals("F1", info.getContentParam()[0]);
         assertNotNull(info.getFieldInfoList());
-        assertEquals("not-json", info.getFieldInfoList().get(0).getVal());
+        assertEquals("old", info.getFieldInfoList().get(0).getOldFieldVal());
+        assertEquals("new", info.getFieldInfoList().get(0).getNewFieldVal());
     }
 
     private static HttpServletRequest requestWithHeaders(Map<String, String> headers, String remoteAddr) {

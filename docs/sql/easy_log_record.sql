@@ -19,11 +19,12 @@ CREATE TABLE IF NOT EXISTS `easy_log_record` (
   `http_method`     VARCHAR(16)     DEFAULT NULL COMMENT 'HTTP方法',
   `class_method`    VARCHAR(256)    DEFAULT NULL COMMENT '类.方法',
   `param_json`      MEDIUMTEXT      DEFAULT NULL COMMENT '方法参数JSON',
-  `detail`          MEDIUMTEXT      DEFAULT NULL COMMENT '详情原文/对比源',
+  `before`          MEDIUMTEXT      DEFAULT NULL COMMENT '变更前快照（用于字段对比）',
+  `after`           MEDIUMTEXT      DEFAULT NULL COMMENT '变更后快照（用于字段对比）',
+  `extra`           MEDIUMTEXT      DEFAULT NULL COMMENT '扩展信息（不参与对比）',
   `field_info_json` MEDIUMTEXT      DEFAULT NULL COMMENT '差异字段JSON',
   `created_at`      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_biz_no_time` (`biz_no`, `operate_time`),
   KEY `idx_platform_module_time` (`platform`, `module`, `operate_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志表';
-

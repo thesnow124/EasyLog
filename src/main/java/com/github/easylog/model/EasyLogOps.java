@@ -32,7 +32,11 @@ public class EasyLogOps {
      */
     private String[] failParamList;
 
-    private String details;
+    private String before;
+
+    private String after;
+
+    private String extra;
 
     private String condition;
 
