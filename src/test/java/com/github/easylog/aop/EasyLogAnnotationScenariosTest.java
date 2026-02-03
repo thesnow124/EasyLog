@@ -26,6 +26,7 @@ import org.springframework.test.context.support.DependencyInjectionTestExecution
 import org.springframework.test.context.support.DirtiesContextTestExecutionListener;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -179,6 +180,21 @@ class EasyLogAnnotationScenariosTest {
                     .withOldNew("{\"age\":1}", "{\"age\":2}");
 
             scenarioService.diff(request);
+
+            EasyLogInfo info = singleLog();
+            assertNotNull(info.getDetail());
+            List<FieldInfo> fields = info.getFieldInfoList();
+            assertEquals(1, fields.size());
+            assertTrue(fields.get(0).getFieldName().contains("age"));
+            assertEquals("1", fields.get(0).getOldFieldVal());
+            assertEquals("2", fields.get(0).getNewFieldVal());
+        }
+
+        @Test
+        void builds_field_info_list_from_detail_object_array() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-201");
+
+            scenarioService.diffObject(request);
 
             EasyLogInfo info = singleLog();
             assertNotNull(info.getDetail());
@@ -346,6 +362,22 @@ class EasyLogAnnotationScenariosTest {
                 success = "diff"
         )
         public void diff(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                detail = "{{T(java.util.Arrays).asList(#oldObj, #newObj)}}",
+                success = "diff-obj"
+        )
+        public void diffObject(ScenarioRequest request) {
+            Map<String, Object> oldObj = new HashMap<>();
+            oldObj.put("age", 1);
+            Map<String, Object> newObj = new HashMap<>();
+            newObj.put("age", 2);
+            EasyLogContext.put("oldObj", oldObj);
+            EasyLogContext.put("newObj", newObj);
         }
 
         @EasyLog(

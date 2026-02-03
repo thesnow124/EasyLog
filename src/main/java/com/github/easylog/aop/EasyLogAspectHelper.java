@@ -186,20 +186,32 @@ final class EasyLogAspectHelper {
             return Collections.singletonList(fieldDiff);
         }
         // 支持 detail=[old,new,...] 形式的 JSON 数组，取第一个元素为旧值，最后一个元素为新值
-        String oldBean = null;
-        String newBean = detail;
         if (o instanceof JSONArray) {
-            List<String> list = JSON.parseArray(detail, String.class);
-            if (CollectionUtils.isEmpty(list)) {
+            JSONArray array = (JSONArray) o;
+            if (CollectionUtils.isEmpty(array)) {
                 return Collections.emptyList();
             }
-            oldBean = list.get(0);
-            newBean = list.size() > 1 ? list.get(list.size() - 1) : null;
+            String oldBean = toJsonString(array.get(0));
+            String newBean = array.size() > 1 ? toJsonString(array.get(array.size() - 1)) : null;
+            return Equator.getDiffField(oldBean, newBean);
         } else {
             FieldInfo fieldDiff = new FieldInfo();
             fieldDiff.setVal(detail);
             return Collections.singletonList(fieldDiff);
         }
-        return Equator.getDiffField(oldBean, newBean);
+    }
+
+    private static String toJsonString(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof String) {
+            return (String) value;
+        }
+        try {
+            return JSON.toJSONString(value);
+        } catch (Exception e) {
+            return String.valueOf(value);
+        }
     }
 }

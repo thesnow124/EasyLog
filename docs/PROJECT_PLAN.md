@@ -1,4 +1,4 @@
-# easy-log 项目规划（基于 Spring Boot 3 / Java 17）
+# easy-log 项目规划（基于 Spring Boot 2.5 / Java 8）
 
 本文档基于“如何优雅地记录操作日志”的思路整理，作为 easy-log SDK 的目标、设计与路线图说明，便于快速对齐项目方向与落地细节。
 
@@ -36,6 +36,7 @@ easy-log 选择 AOP 注解方式，在方法调用维度收集上下文并拼装
 - AOP 注解：用切面统一采集方法上下文，拼装日志实体并输出/持久化。
 - 模板语法：
   - SpEL：`{{ <SpEL> }}`，示例 `{{#userDto.name}}`、`{{#_result}}`、`{{#_errMsg}}`、`{{@bean.method(#arg)}}`。
+  - 自定义函数 DSL：`{funcName{SpEL}}`，由 `ParseFunction` 提供，可标记前置执行。
   - 文本占位符：`success`/`fail` 模板中 `${}` 顺序占位，对应 `successParamList`/`failParamList` 的解析结果（按顺序替换）。
 - 上下文：`EasyLogContext`（ThreadLocal 变量上下文，模板里 `{{#key}}` 可直接取值）。
 
@@ -67,6 +68,7 @@ easy-log 选择 AOP 注解方式，在方法调用维度收集上下文并拼装
 
 ### 6.2 模板与表达式
 - SpEL：`{{#param.path}}`、`{{#_result}}`、`{{#_errMsg}}`、`{{@bean.method(#args)}}`
+- 自定义函数 DSL：`{funcName{#arg}}`（实现 `ParseFunction`）
 - 文本占位：`用户：${} 已被禁用，原因：${}` → `successParamList = {"{{#user.name}}","{{#reason}}"}`
 
 ### 6.3 示例
@@ -104,12 +106,12 @@ public void manyLog(String name) { ... }
 - 线程/异步：若业务切换线程，`OpLogContext` 不会自动传递；如需跨线程上下文，可结合 TTL（TransmittableThreadLocal）进行扩展
 
 ## 9. 依赖与兼容性
-- 运行环境：Java 17+，Spring Boot 3.x（Jakarta 命名空间）
+- 运行环境：Java 8+，Spring Boot 2.5.x（javax 命名空间）
   - 最小依赖策略：
-  - 必需：`spring-boot-autoconfigure`、`spring-aop`、`aspectjrt`、`aspectjweaver`(runtime)、`commons-lang3`、`guava`、`fastjson`、`javers-core`
-  - 可选/不传递：`spring-web`（请求上下文）、`jakarta.servlet-api`（provided）、`slf4j-api`
+  - 必需：`spring-boot-autoconfigure`、`spring-aop`、`spring-tx`、`aspectjrt`、`aspectjweaver`(runtime)、`commons-lang3`、`fastjson2`、`javers-core`
+  - 可选/不传递：`spring-web`（请求上下文）、`javax.servlet-api`（provided）、`javax.annotation-api`、`slf4j-api`
   - 编译期：`lombok`（provided）
-- 不兼容 Boot 2.x（`javax.*` → `jakarta.*` 已整体迁移）
+- 不兼容 Boot 3.x（Jakarta）
 
 ## 10. 持久化与查询建议
 - 默认实现：`DefaultLogRecordServiceImpl` 使用 `log.info` 输出 JSON
@@ -137,7 +139,7 @@ public void manyLog(String name) { ... }
 
 ## 14. 版本路线图
 - v1.0（已完成）
-  - Boot 3 / Java 17 支持；`javax`→`jakarta`
+  - Boot 2.5 / Java 8 支持（javax）
   - 注解、AOP、SpEL、函数、差异对比、默认输出
   - 最小依赖打包策略
 - v1.1
@@ -152,9 +154,9 @@ public void manyLog(String name) { ... }
   - 更丰富的埋点注解与链路聚合能力（保持轻量）
 
 ## 15. 迁移指南
-- 自定义函数 DSL 删除：`{funcName{SpEL}}` → `{{ @beanName.method(SpEL) }}`
-- 导入包迁移：`javax.*` → `jakarta.*`（如 `PostConstruct`、`HttpServletRequest`）
-- 运行环境：JDK 17+
+- 运行环境：JDK 8+ / Spring Boot 2.5.x（javax）
+- 若从 Boot 3/Jakarta 回退：`jakarta.*` → `javax.*`（如 `PostConstruct`、`HttpServletRequest`）
+- 自定义函数 DSL 仍保留：`{funcName{SpEL}}`；也可使用 `{{ @beanName.method(SpEL) }}` 调用 Spring Bean
 
 ## 16. FAQ（节选）
 - Q：非 Web 项目能用吗？
@@ -166,4 +168,4 @@ public void manyLog(String name) { ... }
 
 ---
 
-附：灵感来源文章《如何优雅地记录操作日志》强调“与业务解耦、模板化、可读可配”，easy-log 的设计与实现沿着该思路，结合 Spring AOP 与 SpEL、自定义函数、上下文栈与最小依赖策略落地，适配 Boot 3 / Java 17 生态。
+附：灵感来源文章《如何优雅地记录操作日志》强调“与业务解耦、模板化、可读可配”，easy-log 的设计与实现沿着该思路，结合 Spring AOP 与 SpEL、自定义函数、上下文栈与最小依赖策略落地，适配 Boot 2.5 / Java 8 生态。
