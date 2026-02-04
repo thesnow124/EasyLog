@@ -206,6 +206,59 @@ class EasyLogAnnotationScenariosTest {
             assertEquals("1", fields.get(0).getOldFieldVal());
             assertEquals("2", fields.get(0).getNewFieldVal());
         }
+
+        @Test
+        void builds_field_info_list_from_array_before_after() {
+            ScenarioRequest request = ScenarioRequest.base().withOldNew("[1,2]", "[2,3,4]");
+
+            scenarioService.diff(request);
+
+            EasyLogInfo info = singleLog();
+            List<FieldInfo> fields = info.getFieldInfoList();
+            assertTrue(fields.stream().anyMatch(f -> "1".equals(f.getOldFieldVal()) && "2".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> "2".equals(f.getOldFieldVal()) && "3".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> "".equals(f.getOldFieldVal()) && "4".equals(f.getNewFieldVal())));
+        }
+
+        @Test
+        void builds_field_info_list_from_scalar_before_after() {
+            ScenarioRequest request = ScenarioRequest.base().withOldNew("1", "2");
+
+            scenarioService.diff(request);
+
+            EasyLogInfo info = singleLog();
+            List<FieldInfo> fields = info.getFieldInfoList();
+            assertTrue(fields.stream().anyMatch(f -> "1".equals(f.getOldFieldVal()) && "2".equals(f.getNewFieldVal())));
+        }
+
+        @Test
+        void falls_back_for_non_json_before_after() {
+            ScenarioRequest request = ScenarioRequest.base().withOldNew("plain", "next");
+
+            scenarioService.diff(request);
+
+            EasyLogInfo info = singleLog();
+            List<FieldInfo> fields = info.getFieldInfoList();
+            assertEquals(1, fields.size());
+            assertEquals("plain", fields.get(0).getOldFieldVal());
+            assertEquals("next", fields.get(0).getNewFieldVal());
+        }
+
+        @Test
+        void builds_field_info_list_from_reference_object() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-202");
+
+            scenarioService.diffRefObject(request);
+
+            EasyLogInfo info = singleLog();
+            List<FieldInfo> fields = info.getFieldInfoList();
+            assertTrue(fields.stream().anyMatch(f -> f.getFieldName() != null
+                    && f.getFieldName().contains("detail")
+                    && f.getOldFieldVal() != null
+                    && f.getOldFieldVal().contains("old")
+                    && f.getNewFieldVal() != null
+                    && f.getNewFieldVal().contains("new")));
+        }
     }
 
     @Nested
@@ -386,6 +439,19 @@ class EasyLogAnnotationScenariosTest {
 
         @EasyLog(
                 module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                before = "{{#oldRef}}",
+                after = "{{#newRef}}",
+                success = "diff-ref"
+        )
+        public void diffRefObject(ScenarioRequest request) {
+            EasyLogContext.put("oldRef", new RefObject("old"));
+            EasyLogContext.put("newRef", new RefObject("new"));
+        }
+
+        @EasyLog(
+                module = "user",
                 type = "READ",
                 bizNo = "{{#request.bizNo}}",
                 success = "label {{@labelService.label(#request.labelId)}}"
@@ -530,6 +596,30 @@ class EasyLogAnnotationScenariosTest {
 
         public String getLabelId() {
             return labelId;
+        }
+    }
+
+    static class RefObject {
+        private final RefDetail detail;
+
+        RefObject(String code) {
+            this.detail = new RefDetail(code);
+        }
+
+        public RefDetail getDetail() {
+            return detail;
+        }
+    }
+
+    static class RefDetail {
+        private final String code;
+
+        RefDetail(String code) {
+            this.code = code;
+        }
+
+        public String getCode() {
+            return code;
         }
     }
 

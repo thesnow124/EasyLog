@@ -49,17 +49,16 @@ public class Equator {
         }
         String oldStr = oldBean == null ? "" : oldBean;
         String newStr = newBean == null ? "" : newBean;
-        // 2) 任一非 JSON：不做字段拆分，原样记录旧/新值
-        if (!isJsonString(oldStr) || !isJsonString(newStr)) {
+        // 2) JSON：转成可比对象后用 JaVers 计算差异
+        Object left = toComparable(oldStr);
+        Object right = toComparable(newStr);
+        // 2.1) 非结构化或顶层标量值（如数字/字符串/布尔）不支持 JaVers compare，回退为旧/新值
+        if (!isStructured(left) || !isStructured(right)) {
             FieldInfo fieldDiff = new FieldInfo();
             fieldDiff.setOldFieldVal(oldStr);
             fieldDiff.setNewFieldVal(newStr);
             return Collections.singletonList(fieldDiff);
         }
-
-        // 3) JSON：转成可比对象后用 JaVers 计算差异
-        Object left = toComparable(oldStr);
-        Object right = toComparable(newStr);
         Diff diff = JAVERS_IGNORE_LIST_ORDER.compare(left, right);
         if (!diff.hasChanges()) {
             return new ArrayList<>();
@@ -153,16 +152,6 @@ public class Equator {
         return base + suffix;
     }
 
-    private static boolean isJsonString(String str) {
-        boolean result = false;
-        try {
-            JSON.parse(str);
-            result = true;
-        } catch (Exception ignored) {
-        }
-        return result;
-    }
-
     private static Object toComparable(String json) {
         String s = json.trim();
         try {
@@ -176,6 +165,10 @@ public class Equator {
             // ignore and fall back to raw string
         }
         return s;
+    }
+
+    private static boolean isStructured(Object value) {
+        return value instanceof Map || value instanceof List;
     }
 
     private static String stringValue(Object value) {
