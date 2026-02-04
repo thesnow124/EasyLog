@@ -11,7 +11,7 @@
 
     <groupId>com.github</groupId>
     <artifactId>easy-log</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.0-20260204-SNAPSHOT</version>
     <packaging>jar</packaging>
 
 
