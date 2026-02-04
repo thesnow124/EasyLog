@@ -3,7 +3,6 @@ package com.github.easylog.support;
 
 import com.github.easylog.configuration.EasyLogProperties;
 import com.github.easylog.service.IOperatorService;
-import org.apache.commons.lang3.StringUtils;
 
 /**
  * @author Gaosl
@@ -24,6 +23,19 @@ public class DefaultOperatorServiceImpl implements IOperatorService {
     @Override
     public String getPlatform() {
         String platform = properties.getPlatform();
-        return StringUtils.isNotBlank(platform) ? platform : "unknown";
+        return isNotBlank(platform) ? platform : "unknown";
+    }
+
+    private static boolean isNotBlank(String value) {
+        if (value == null) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (!Character.isWhitespace(value.charAt(i))) {
+                return true;
+            }
+        }
+        return false;
     }
 }
+

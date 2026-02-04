@@ -9,7 +9,6 @@ import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -20,6 +19,8 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import javax.servlet.http.HttpServletRequest;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -138,7 +139,7 @@ public class EasyLogAspect {
                 easyLogInfo.setResult(JSON.toJSONString(executeResult.getResult()));
                 easyLogInfo.setSuccess(executeResult.isSuccess());
                 if (Objects.nonNull(executeResult.getThrowable())) {
-                    easyLogInfo.setStackTrace(ExceptionUtils.getStackTrace(executeResult.getThrowable()));
+                    easyLogInfo.setStackTrace(getStackTrace(executeResult.getThrowable()));
                 }
                 easyLogInfo.setErrorMsg(executeResult.getErrMsg());
                 easyLogInfo.setExecuteTime(executeResult.getExecuteTime());
@@ -158,6 +159,18 @@ public class EasyLogAspect {
             throw executeResult.getThrowable();
         }
         return executeResult.getResult();
+    }
+
+
+    private static String getStackTrace(Throwable throwable) {
+        if (throwable == null) {
+            return null;
+        }
+        StringWriter sw = new StringWriter();
+        PrintWriter pw = new PrintWriter(sw);
+        throwable.printStackTrace(pw);
+        pw.flush();
+        return sw.toString();
     }
 
     private void recordLogs(List<EasyLogInfo> logs) {

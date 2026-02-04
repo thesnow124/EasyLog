@@ -1,7 +1,5 @@
 package com.github.easylog.util;
 
-import org.apache.commons.lang3.StringUtils;
-
 import java.util.Map;
 import java.util.Objects;
 import java.util.Properties;
@@ -73,7 +71,7 @@ public class PlaceholderResolver {
      * @return
      */
     public String resolve(String content, String[] values) {
-        if (StringUtils.isBlank(content) || Objects.isNull(values)) {
+        if (isBlank(content) || Objects.isNull(values)) {
             return content;
         }
         int start = content.indexOf(this.placeholderPrefix);
@@ -104,6 +102,18 @@ public class PlaceholderResolver {
      */
     public String resolve(String content, Object... values) {
         return resolve(content, Stream.of(values).map(String::valueOf).toArray(String[]::new));
+    }
+
+    private static boolean isBlank(String value) {
+        if (value == null) {
+            return true;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (!Character.isWhitespace(value.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
