@@ -1,7 +1,5 @@
 package com.github.easylog.configuration;
 
-import lombok.Getter;
-import lombok.Setter;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -9,8 +7,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 /**
  * @author Gaosl
  */
-@Setter
-@Getter
 @ConfigurationProperties(prefix = "easylog")
 public class EasyLogProperties {
     /**
@@ -35,4 +31,35 @@ public class EasyLogProperties {
      */
     private boolean afterCommit = false;
 
+    public boolean isEnable() {
+        return enable;
+    }
+
+    public void setEnable(boolean enable) {
+        this.enable = enable;
+    }
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
+    }
+
+    public String getStore() {
+        return store;
+    }
+
+    public void setStore(String store) {
+        this.store = store;
+    }
+
+    public boolean isAfterCommit() {
+        return afterCommit;
+    }
+
+    public void setAfterCommit(boolean afterCommit) {
+        this.afterCommit = afterCommit;
+    }
 }

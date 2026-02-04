@@ -2,15 +2,13 @@ package com.github.easylog.configuration;
 
 
 import com.github.easylog.aop.EasyLogAspect;
-import com.github.easylog.service.ILogRecordService;
-import com.github.easylog.service.IOperatorService;
 import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.function.ParseFunction;
 import com.github.easylog.function.ParseFunctionFactory;
+import com.github.easylog.service.ILogRecordService;
+import com.github.easylog.service.IOperatorService;
 import com.github.easylog.support.DefaultLogRecordServiceImpl;
 import com.github.easylog.support.DefaultOperatorServiceImpl;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.annotation.Aspect;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
@@ -40,11 +38,13 @@ import org.springframework.context.annotation.Role;
 @Configuration
 @ConditionalOnProperty(prefix = "easylog", name = "enable", havingValue = "true", matchIfMissing = true)
 @EnableConfigurationProperties({EasyLogProperties.class})
-@RequiredArgsConstructor
-@Slf4j
 public class EasyLogAutoConfiguration {
 
     private final EasyLogProperties easyLogProperties;
+
+    public EasyLogAutoConfiguration(EasyLogProperties easyLogProperties) {
+        this.easyLogProperties = easyLogProperties;
+    }
 
     @Bean
     public ParseFunctionFactory parseFunctionFactory(java.util.List<ParseFunction> parseFunctions) {

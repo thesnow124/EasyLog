@@ -1,8 +1,8 @@
 package com.github.easylog.support;
 
 
-import com.github.easylog.service.IOperatorService;
 import com.github.easylog.configuration.EasyLogProperties;
+import com.github.easylog.service.IOperatorService;
 import org.apache.commons.lang3.StringUtils;
 
 /**

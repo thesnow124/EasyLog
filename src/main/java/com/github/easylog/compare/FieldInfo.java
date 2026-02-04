@@ -1,13 +1,9 @@
 package com.github.easylog.compare;
 
 
-import lombok.Data;
-
-
 /**
  * @author Gaosl
  */
-@Data
 public class FieldInfo {
 
     /**
@@ -30,4 +26,36 @@ public class FieldInfo {
      * 详情属性值
      */
     private String val;
+
+    public String getFieldName() {
+        return fieldName;
+    }
+
+    public void setFieldName(String fieldName) {
+        this.fieldName = fieldName;
+    }
+
+    public String getOldFieldVal() {
+        return oldFieldVal;
+    }
+
+    public void setOldFieldVal(String oldFieldVal) {
+        this.oldFieldVal = oldFieldVal;
+    }
+
+    public String getNewFieldVal() {
+        return newFieldVal;
+    }
+
+    public void setNewFieldVal(String newFieldVal) {
+        this.newFieldVal = newFieldVal;
+    }
+
+    public String getVal() {
+        return val;
+    }
+
+    public void setVal(String val) {
+        this.val = val;
+    }
 }

@@ -2,14 +2,13 @@ package com.github.easylog.aop;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.easylog.annotation.EasyLog;
-import com.github.easylog.service.ILogRecordService;
-import com.github.easylog.service.IOperatorService;
 import com.github.easylog.context.EasyLogContext;
 import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
-import lombok.extern.slf4j.Slf4j;
+import com.github.easylog.service.ILogRecordService;
+import com.github.easylog.service.IOperatorService;
 import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -28,6 +27,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 /**
@@ -43,8 +44,9 @@ import java.util.stream.Collectors;
  * @author gaoshuanglong
  */
 @Aspect
-@Slf4j
 public class EasyLogAspect {
+
+    private static final Logger LOG = Logger.getLogger(EasyLogAspect.class.getName());
 
     private final ILogRecordService logRecordService;
     private final IOperatorService operatorService;
@@ -85,7 +87,7 @@ public class EasyLogAspect {
             expressTemplateList = EasyLogAspectHelper.getExpressTemplate(easyLogOpsList);
             customFunctionExecResultMap = easyLogParser.processBeforeExec(expressTemplateList, method, args, targetClass);
         } catch (Exception e) {
-            log.info("方法前逻辑发生异常", e);
+            LOG.log(Level.INFO, "方法前逻辑发生异常", e);
         }
 
         // 解析通用信息：请求元数据、参数快照、类名+方法名
@@ -105,7 +107,7 @@ public class EasyLogAspect {
             Map<String, Object> param = EasyLogAspectHelper.buildRequestParam(nameArray, valueArray);
             executeResult.setParam(param);
         } catch (Exception e) {
-            log.info("解析通用信息发生异常", e);
+            LOG.log(Level.INFO, "解析通用信息发生异常", e);
         }
 
         // 方法逻辑：执行业务方法并捕获结果/异常；使用上下文栈隔离嵌套调用
@@ -149,7 +151,7 @@ public class EasyLogAspect {
             });
             recordLogs(easyLogInfos);
         } catch (Exception e) {
-            log.info("方法后逻辑发生异常", e);
+            LOG.log(Level.INFO, "方法后逻辑发生异常", e);
         }
 
         if (!executeResult.isSuccess()) {

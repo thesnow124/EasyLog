@@ -1,7 +1,6 @@
 package com.github.easylog.compare;
 
 import com.alibaba.fastjson2.JSON;
-import lombok.extern.slf4j.Slf4j;
 import org.javers.core.Javers;
 import org.javers.core.JaversBuilder;
 import org.javers.core.diff.Change;
@@ -37,7 +36,6 @@ import java.util.Map;
  * </ul>
  * @author gaoshuanglong
  */
-@Slf4j
 public class Equator {
 
     private static final Javers JAVERS_IGNORE_LIST_ORDER = JaversBuilder.javers()
@@ -63,7 +61,9 @@ public class Equator {
         Object left = toComparable(oldStr);
         Object right = toComparable(newStr);
         Diff diff = JAVERS_IGNORE_LIST_ORDER.compare(left, right);
-        if (!diff.hasChanges()) return new ArrayList<>();
+        if (!diff.hasChanges()) {
+            return new ArrayList<>();
+        }
 
         List<FieldInfo> list = new ArrayList<>();
         for (Change change : diff.getChanges()) {

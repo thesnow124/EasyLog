@@ -2,7 +2,6 @@ package com.github.easylog.model;
 
 
 import com.github.easylog.compare.FieldInfo;
-import lombok.Data;
 
 import java.util.List;
 import java.util.Map;
@@ -10,121 +9,303 @@ import java.util.Map;
 /**
  * @author Gaosl
  */
-@Data
 public class EasyLogInfo {
 
-	/**
-	 * ip
-	 */
-	private String ip;
+    /**
+     * ip
+     */
+    private String ip;
 
-	/**
-	 * url
-	 */
-	private String url;
+    /**
+     * url
+     */
+    private String url;
 
-	/**
-	 * HTTP请求方式
-	 */
-	private String httpMethod;
+    /**
+     * HTTP请求方式
+     */
+    private String httpMethod;
 
-	/**
-	 * 类.方法
-	 */
-	private String classMethod;
+    /**
+     * 类.方法
+     */
+    private String classMethod;
 
-	/**
-	 * 接口参数
-	 */
-	private Map<String, Object> param;
-
-
-	/**
-	 * 平台
-	 */
-	private String platform;
-
-	/**
-	 * 操作者
-	 */
-	private String operator;
-
-	/**
-	 * 操作时间 时间戳单位：ms
-	 */
-	private Long operateTime;
-
-	/**
-	 * 业务id
-	 */
-	private String bizNo;
-
-	/**
-	 * 模块
-	 */
-	private String module;
-
-	/**
-	 * 操作类型
-	 */
-	private String type;
-
-	/**
-	 * 操作内容
-	 */
-	private String content;
-
-	/**
-	 * 操作参数
-	 */
-	private String[] contentParam;
-
-	/**
-	 * 操作花费的时间 单位：ms
-	 */
-	private Long executeTime;
-
-	/**
-	 * 是否调用成功
-	 */
-	private Boolean success;
-
-	/**
-	 * 执行后返回的json字符串
-	 */
-	private String result;
-
-	private String errorMsg;
-
-	/**
-	 * 异常堆栈信息
-	 */
-	private String stackTrace;
+    /**
+     * 接口参数
+     */
+    private Map<String, Object> param;
 
 
-	/**
-	 * 变更前快照（用于字段差异对比）
-	 */
-	private String before;
+    /**
+     * 平台
+     */
+    private String platform;
 
-	/**
-	 * 变更后快照（用于字段差异对比）
-	 */
-	private String after;
+    /**
+     * 操作者
+     */
+    private String operator;
 
-	/**
-	 * 额外扩展信息（不参与字段差异对比）
-	 */
-	private String extra;
+    /**
+     * 操作时间 时间戳单位：ms
+     */
+    private Long operateTime;
 
-	/**
-	 * 详细的字段变更
-	 */
-	private List<FieldInfo> fieldInfoList;
+    /**
+     * 业务id
+     */
+    private String bizNo;
 
-	/**
-	 * 记录条件
-	 */
-	private String condition;
+    /**
+     * 模块
+     */
+    private String module;
 
+    /**
+     * 操作类型
+     */
+    private String type;
+
+    /**
+     * 操作内容
+     */
+    private String content;
+
+    /**
+     * 操作参数
+     */
+    private String[] contentParam;
+
+    /**
+     * 操作花费的时间 单位：ms
+     */
+    private Long executeTime;
+
+    /**
+     * 是否调用成功
+     */
+    private Boolean success;
+
+    /**
+     * 执行后返回的json字符串
+     */
+    private String result;
+
+    private String errorMsg;
+
+    /**
+     * 异常堆栈信息
+     */
+    private String stackTrace;
+
+
+    /**
+     * 变更前快照（用于字段差异对比）
+     */
+    private String before;
+
+    /**
+     * 变更后快照（用于字段差异对比）
+     */
+    private String after;
+
+    /**
+     * 额外扩展信息（不参与字段差异对比）
+     */
+    private String extra;
+
+    /**
+     * 详细的字段变更
+     */
+    private List<FieldInfo> fieldInfoList;
+
+    /**
+     * 记录条件
+     */
+    private String condition;
+
+    public String getIp() {
+        return ip;
+    }
+
+    public void setIp(String ip) {
+        this.ip = ip;
+    }
+
+    public String getUrl() {
+        return url;
+    }
+
+    public void setUrl(String url) {
+        this.url = url;
+    }
+
+    public String getHttpMethod() {
+        return httpMethod;
+    }
+
+    public void setHttpMethod(String httpMethod) {
+        this.httpMethod = httpMethod;
+    }
+
+    public String getClassMethod() {
+        return classMethod;
+    }
+
+    public void setClassMethod(String classMethod) {
+        this.classMethod = classMethod;
+    }
+
+    public Map<String, Object> getParam() {
+        return param;
+    }
+
+    public void setParam(Map<String, Object> param) {
+        this.param = param;
+    }
+
+    public String getPlatform() {
+        return platform;
+    }
+
+    public void setPlatform(String platform) {
+        this.platform = platform;
+    }
+
+    public String getOperator() {
+        return operator;
+    }
+
+    public void setOperator(String operator) {
+        this.operator = operator;
+    }
+
+    public Long getOperateTime() {
+        return operateTime;
+    }
+
+    public void setOperateTime(Long operateTime) {
+        this.operateTime = operateTime;
+    }
+
+    public String getBizNo() {
+        return bizNo;
+    }
+
+    public void setBizNo(String bizNo) {
+        this.bizNo = bizNo;
+    }
+
+    public String getModule() {
+        return module;
+    }
+
+    public void setModule(String module) {
+        this.module = module;
+    }
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public String[] getContentParam() {
+        return contentParam;
+    }
+
+    public void setContentParam(String[] contentParam) {
+        this.contentParam = contentParam;
+    }
+
+    public Long getExecuteTime() {
+        return executeTime;
+    }
+
+    public void setExecuteTime(Long executeTime) {
+        this.executeTime = executeTime;
+    }
+
+    public Boolean getSuccess() {
+        return success;
+    }
+
+    public void setSuccess(Boolean success) {
+        this.success = success;
+    }
+
+    public String getResult() {
+        return result;
+    }
+
+    public void setResult(String result) {
+        this.result = result;
+    }
+
+    public String getErrorMsg() {
+        return errorMsg;
+    }
+
+    public void setErrorMsg(String errorMsg) {
+        this.errorMsg = errorMsg;
+    }
+
+    public String getStackTrace() {
+        return stackTrace;
+    }
+
+    public void setStackTrace(String stackTrace) {
+        this.stackTrace = stackTrace;
+    }
+
+    public String getBefore() {
+        return before;
+    }
+
+    public void setBefore(String before) {
+        this.before = before;
+    }
+
+    public String getAfter() {
+        return after;
+    }
+
+    public void setAfter(String after) {
+        this.after = after;
+    }
+
+    public String getExtra() {
+        return extra;
+    }
+
+    public void setExtra(String extra) {
+        this.extra = extra;
+    }
+
+    public List<FieldInfo> getFieldInfoList() {
+        return fieldInfoList;
+    }
+
+    public void setFieldInfoList(List<FieldInfo> fieldInfoList) {
+        this.fieldInfoList = fieldInfoList;
+    }
+
+    public String getCondition() {
+        return condition;
+    }
+
+    public void setCondition(String condition) {
+        this.condition = condition;
+    }
 }

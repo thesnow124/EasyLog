@@ -4,7 +4,6 @@ package com.github.easylog.function;
 import com.alibaba.fastjson2.JSON;
 import com.github.easylog.constants.EasyLogConsts;
 import com.github.easylog.context.EasyLogCachedExpressionEvaluator;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
@@ -16,6 +15,8 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,9 +27,11 @@ import java.util.regex.Pattern;
  *     <li>纯 SpEL 块：<code>{{ SpEL }}</code>，可引用参数、返回值、异常信息或 Spring Bean。</li>
  * </ul>
  * 解析流程：前置阶段缓存需要提前执行的函数结果；后置阶段先替换函数块，再替换 SpEL，最后回退解析纯表达式。
+ * @author gaoshuanglong
  */
-@Slf4j
 public class EasyLogParser implements BeanFactoryAware {
+
+    private static final Logger LOG = Logger.getLogger(EasyLogParser.class.getName());
 
     private BeanFactory beanFactory;
     private final ParseFunctionFactory parseFunctionFactory;
@@ -167,14 +170,14 @@ public class EasyLogParser implements BeanFactoryAware {
     private String applyFunction(String funcName, String arg) {
         ParseFunction function = parseFunctionFactory.getFunction(funcName);
         if (function == null) {
-            log.warn("未找到自定义函数: {}", funcName);
+            LOG.warning("未找到自定义函数: " + funcName);
             return arg == null ? "" : arg;
         }
         try {
             String val = function.apply(arg);
             return val == null ? "" : val;
         } catch (Exception e) {
-            log.warn("自定义函数执行异常: {}", funcName, e);
+            LOG.log(Level.WARNING, "自定义函数执行异常: " + funcName, e);
             return "";
         }
     }
@@ -186,7 +189,7 @@ public class EasyLogParser implements BeanFactoryAware {
         try {
             return cachedExpressionEvaluator.parseExpression(expr, key, ctx);
         } catch (Exception e) {
-            log.warn("SpEL 解析失败: {}", expr);
+            LOG.log(Level.WARNING, "SpEL 解析失败: " + expr, e);
             return null;
         }
     }
