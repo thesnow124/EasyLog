@@ -26,6 +26,7 @@ import org.springframework.test.context.support.DependencyInjectionTestExecution
 import org.springframework.test.context.support.DirtiesContextTestExecutionListener;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -259,6 +260,58 @@ class EasyLogAnnotationScenariosTest {
                     && f.getNewFieldVal() != null
                     && f.getNewFieldVal().contains("new")));
         }
+
+        @Test
+        void builds_field_info_list_from_map_entry_changes() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-203");
+
+            scenarioService.diffMap(request);
+
+            EasyLogInfo info = singleLog();
+            List<FieldInfo> fields = info.getFieldInfoList();
+            assertTrue(fields.stream().anyMatch(f -> "1".equals(f.getOldFieldVal()) && "".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> "2".equals(f.getOldFieldVal()) && "3".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> "".equals(f.getOldFieldVal()) && "4".equals(f.getNewFieldVal())));
+        }
+
+        @Test
+        void builds_field_info_list_from_list_element_change_and_add() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-204");
+
+            scenarioService.diffListAdd(request);
+
+            EasyLogInfo info = singleLog();
+            List<FieldInfo> fields = info.getFieldInfoList();
+            assertTrue(fields.stream().anyMatch(f -> "2".equals(f.getOldFieldVal()) && "3".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> "".equals(f.getOldFieldVal()) && "4".equals(f.getNewFieldVal())));
+        }
+
+        @Test
+        void builds_field_info_list_from_list_element_remove() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-205");
+
+            scenarioService.diffListRemove(request);
+
+            EasyLogInfo info = singleLog();
+            List<FieldInfo> fields = info.getFieldInfoList();
+            assertTrue(fields.stream().anyMatch(f -> "2".equals(f.getOldFieldVal()) && "".equals(f.getNewFieldVal())));
+        }
+
+        @Test
+        void builds_field_info_list_from_complex_object_fields() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-206");
+
+            scenarioService.diffAllFields(request);
+
+            EasyLogInfo info = singleLog();
+            List<FieldInfo> fields = info.getFieldInfoList();
+            assertTrue(fields.stream().anyMatch(f -> "b".equals(f.getOldFieldVal()) && "c".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> "v1".equals(f.getOldFieldVal()) && "".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> "v2".equals(f.getOldFieldVal()) && "v3".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> "".equals(f.getOldFieldVal()) && "v4".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> f.getFieldName() != null && f.getFieldName().contains("objectList")));
+            assertTrue(fields.stream().anyMatch(f -> f.getFieldName() != null && f.getFieldName().contains("child")));
+        }
     }
 
     @Nested
@@ -452,6 +505,115 @@ class EasyLogAnnotationScenariosTest {
 
         @EasyLog(
                 module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                before = "{{#oldMap}}",
+                after = "{{#newMap}}",
+                success = "diff-map"
+        )
+        public void diffMap(ScenarioRequest request) {
+            Map<String, Object> oldMap = new HashMap<>();
+            oldMap.put("a", 1);
+            oldMap.put("b", 2);
+            Map<String, Object> newMap = new HashMap<>();
+            newMap.put("b", 3);
+            newMap.put("c", 4);
+            EasyLogContext.put("oldMap", oldMap);
+            EasyLogContext.put("newMap", newMap);
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                before = "{{#oldList}}",
+                after = "{{#newList}}",
+                success = "diff-list-add"
+        )
+        public void diffListAdd(ScenarioRequest request) {
+            List<Integer> oldList = new ArrayList<>();
+            oldList.add(1);
+            oldList.add(2);
+            List<Integer> newList = new ArrayList<>();
+            newList.add(1);
+            newList.add(3);
+            newList.add(4);
+            EasyLogContext.put("oldList", oldList);
+            EasyLogContext.put("newList", newList);
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                before = "{{#oldList}}",
+                after = "{{#newList}}",
+                success = "diff-list-remove"
+        )
+        public void diffListRemove(ScenarioRequest request) {
+            List<Integer> oldList = new ArrayList<>();
+            oldList.add(1);
+            oldList.add(2);
+            List<Integer> newList = new ArrayList<>();
+            newList.add(1);
+            EasyLogContext.put("oldList", oldList);
+            EasyLogContext.put("newList", newList);
+        }
+
+        @EasyLog(
+                module = "user",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                before = "{{#oldAll}}",
+                after = "{{#newAll}}",
+                success = "diff-all"
+        )
+        public void diffAllFields(ScenarioRequest request) {
+            HashMap<String, Object> oldChildAttrs = new HashMap<>();
+            oldChildAttrs.put("ck", "cv1");
+            AllFieldObjects oldChild = new AllFieldObjects(
+                    new ArrayList<>(Arrays.asList("c1", "c2")),
+                    new ArrayList<>(),
+                    null,
+                    oldChildAttrs
+            );
+
+            HashMap<String, Object> newChildAttrs = new HashMap<>();
+            newChildAttrs.put("ck", "cv2");
+            AllFieldObjects newChild = new AllFieldObjects(
+                    new ArrayList<>(Arrays.asList("c1", "c3")),
+                    new ArrayList<>(),
+                    null,
+                    newChildAttrs
+            );
+
+            HashMap<String, Object> oldAttrs = new HashMap<>();
+            oldAttrs.put("k1", "v1");
+            oldAttrs.put("k2", "v2");
+            AllFieldObjects oldAll = new AllFieldObjects(
+                    new ArrayList<>(Arrays.asList("a", "b")),
+                    new ArrayList<>(Arrays.asList(oldChild)),
+                    oldChild,
+                    oldAttrs
+            );
+
+            HashMap<String, Object> newAttrs = new HashMap<>();
+            newAttrs.put("k2", "v3");
+            newAttrs.put("k3", "v4");
+            AllFieldObjects newAll = new AllFieldObjects(
+                    new ArrayList<>(Arrays.asList("a", "c", "d")),
+                    new ArrayList<>(Arrays.asList(newChild, oldChild)),
+                    newChild,
+                    newAttrs
+            );
+
+            EasyLogContext.put("oldAll", oldAll);
+            EasyLogContext.put("newAll", newAll);
+        }
+
+
+        @EasyLog(
+                module = "user",
                 type = "READ",
                 bizNo = "{{#request.bizNo}}",
                 success = "label {{@labelService.label(#request.labelId)}}"
@@ -620,6 +782,39 @@ class EasyLogAnnotationScenariosTest {
 
         public String getCode() {
             return code;
+        }
+    }
+
+    static class AllFieldObjects {
+        private final List<String> stringList;
+        private final List<AllFieldObjects> objectList;
+        private final AllFieldObjects child;
+        private final HashMap<String, Object> attributes;
+
+        AllFieldObjects(List<String> stringList,
+                        List<AllFieldObjects> objectList,
+                        AllFieldObjects child,
+                        HashMap<String, Object> attributes) {
+            this.stringList = stringList;
+            this.objectList = objectList;
+            this.child = child;
+            this.attributes = attributes;
+        }
+
+        public List<String> getStringList() {
+            return stringList;
+        }
+
+        public List<AllFieldObjects> getObjectList() {
+            return objectList;
+        }
+
+        public AllFieldObjects getChild() {
+            return child;
+        }
+
+        public HashMap<String, Object> getAttributes() {
+            return attributes;
         }
     }
 
