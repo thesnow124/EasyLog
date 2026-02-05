@@ -163,7 +163,7 @@ class EasyLogAspectHelperTest {
         ops.setType("t");
         ops.setCondition("condKey");
 
-        Map<String, String> templateMap = new HashMap<>();
+        Map<String, Object> templateMap = new HashMap<>();
         templateMap.put("bizKey", "BIZ-1");
         templateMap.put("beforeKey", "{\"a\":1}");
         templateMap.put("afterKey", "{\"a\":2}");
@@ -199,7 +199,7 @@ class EasyLogAspectHelperTest {
         ops.setSuccess("successKey");
         ops.setCondition("condKey");
 
-        Map<String, String> templateMap = new HashMap<>();
+        Map<String, Object> templateMap = new HashMap<>();
         templateMap.put("bizKey", "BIZ-1");
         templateMap.put("successKey", "success-msg");
         templateMap.put("condKey", "false");
@@ -218,7 +218,7 @@ class EasyLogAspectHelperTest {
         ops.setFail("failKey");
         ops.setFailParamList(new String[]{"failParam"});
 
-        Map<String, String> templateMap = new HashMap<>();
+        Map<String, Object> templateMap = new HashMap<>();
         templateMap.put("bizKey", "BIZ-1");
         templateMap.put("beforeKey", "old");
         templateMap.put("afterKey", "new");

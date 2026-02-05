@@ -2,7 +2,9 @@ package com.github.easylog.compare;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -44,5 +46,16 @@ class EquatorTest {
         assertFalse(diff.isEmpty());
         assertTrue(diff.stream().anyMatch(f -> f.getFieldName() != null && f.getFieldName().contains("list")));
         assertTrue(diff.stream().anyMatch(f -> f.getFieldName() != null && f.getFieldName().contains("map")));
+    }
+
+    @Test
+    void comparesMapObjectsDirectly() {
+        Map<String, Object> oldMap = new HashMap<>();
+        oldMap.put("a", 1);
+        Map<String, Object> newMap = new HashMap<>();
+        newMap.put("a", 2);
+        List<FieldInfo> diff = Equator.getDiffField(oldMap, newMap);
+        assertFalse(diff.isEmpty());
+        assertTrue(diff.stream().anyMatch(f -> "1".equals(f.getOldFieldVal()) && "2".equals(f.getNewFieldVal())));
     }
 }

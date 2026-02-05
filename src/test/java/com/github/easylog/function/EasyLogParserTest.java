@@ -62,6 +62,11 @@ class EasyLogParserTest {
         }
     }
 
+    static class ObjectTarget {
+        void work(Object payload) {
+        }
+    }
+
     @Test
     void processesBeforeAndAfterTemplates() throws Exception {
         AtomicInteger beforeCount = new AtomicInteger();
@@ -91,7 +96,7 @@ class EasyLogParserTest {
         assertFalse(beforeCache.containsKey("{upper{#code}}"));
         assertEquals(1, beforeCount.get());
 
-        Map<String, String> afterMap = parser.processAfterExec(templates, beforeCache, method, args, Target.class, null, "result");
+        Map<String, Object> afterMap = parser.processAfterExec(templates, beforeCache, method, args, Target.class, null, "result");
         assertEquals("v1=before:alice", afterMap.get("v1={before{#name}}"));
         assertEquals("v2=BOB", afterMap.get("v2={upper{#code}}"));
         assertEquals("alice-bob", afterMap.get("{{#name}}-{{#code}}"));
@@ -107,8 +112,23 @@ class EasyLogParserTest {
         EasyLogParser parser = new EasyLogParser(factory);
 
         Method method = Target.class.getDeclaredMethod("work", String.class, String.class);
-        Map<String, String> map = parser.processAfterExec(
+        Map<String, Object> map = parser.processAfterExec(
                 Arrays.asList("#code"), java.util.Collections.<String, String>emptyMap(), method, new Object[]{"x", "y"}, Target.class, null, null);
         assertEquals("y", map.get("#code"));
+    }
+
+    @Test
+    void returnsObjectWhenTemplateIsSingleSpelBlock() throws Exception {
+        ParseFunctionFactory factory = new ParseFunctionFactory(Arrays.asList());
+        EasyLogParser parser = new EasyLogParser(factory);
+
+        Method method = ObjectTarget.class.getDeclaredMethod("work", Object.class);
+        java.util.Map<String, Object> payload = new java.util.HashMap<>();
+        payload.put("a", 1);
+        Map<String, Object> map = parser.processAfterExec(
+                Arrays.asList("{{#p0}}"), java.util.Collections.<String, String>emptyMap(),
+                method, new Object[]{payload}, ObjectTarget.class, null, null);
+        Object resolved = map.get("{{#p0}}");
+        assertEquals(payload, resolved);
     }
 }

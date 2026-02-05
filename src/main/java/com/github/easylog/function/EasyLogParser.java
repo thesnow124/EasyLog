@@ -48,7 +48,7 @@ public class EasyLogParser implements BeanFactoryAware {
     /**
      * After method execution: render all templates. Functions pre-evaluated in before-phase are reused.
      */
-    public Map<String, String> processAfterExec(List<String> expressTemplate,
+    public Map<String, Object> processAfterExec(List<String> expressTemplate,
                                                 Map<String, String> beforeCache,
                                                 Method method,
                                                 Object[] args,
@@ -61,7 +61,7 @@ public class EasyLogParser implements BeanFactoryAware {
     /**
      * After method execution: render all templates with local variables from EasyLogContext.
      */
-    public Map<String, String> processAfterExec(List<String> expressTemplate,
+    public Map<String, Object> processAfterExec(List<String> expressTemplate,
                                                 Map<String, String> beforeCache,
                                                 Method method,
                                                 Object[] args,
@@ -69,14 +69,14 @@ public class EasyLogParser implements BeanFactoryAware {
                                                 String errMsg,
                                                 Object result,
                                                 Map<String, Object> localVars) {
-        HashMap<String, String> map = new HashMap<>();
+        HashMap<String, Object> map = new HashMap<>();
         if (CollectionUtils.isEmpty(expressTemplate)) {
             return map;
         }
         AnnotatedElementKey elementKey = new AnnotatedElementKey(method, targetClass);
         EvaluationContext ctx = cachedExpressionEvaluator.createEvaluationContext(method, args, beanFactory, errMsg, result, localVars);
         for (String template : expressTemplate) {
-            String resolved = resolveTemplate(template, elementKey, ctx, beforeCache);
+            Object resolved = resolveTemplate(template, elementKey, ctx, beforeCache);
             map.put(template, resolved);
         }
         return map;
@@ -116,10 +116,32 @@ public class EasyLogParser implements BeanFactoryAware {
         return cache;
     }
 
-    private String resolveTemplate(String template,
+    private Object resolveTemplate(String template,
                                    AnnotatedElementKey elementKey,
                                    EvaluationContext ctx,
                                    Map<String, String> beforeCache) {
+        if (template == null) {
+            return null;
+        }
+        String trimmed = template.trim();
+        if (isSingleFuncBlock(trimmed)) {
+            Matcher matcher = FUNC_BLOCK.matcher(trimmed);
+            if (matcher.matches()) {
+                String placeholder = matcher.group(0);
+                String funcName = matcher.group(1);
+                String expr = matcher.group(2);
+                return beforeCache != null && beforeCache.containsKey(placeholder)
+                        ? beforeCache.get(placeholder)
+                        : applyFunction(funcName, stringVal(safeEval(expr, elementKey, ctx)));
+            }
+        }
+        if (isSingleSpelBlock(trimmed)) {
+            Matcher matcher = SPEL_BLOCK.matcher(trimmed);
+            if (matcher.matches()) {
+                String expr = matcher.group(1);
+                return safeEval(expr, elementKey, ctx);
+            }
+        }
         // step1: replace function blocks（处理 {funcName{...}} 占位，优先用前置缓存）
         Matcher funcMatcher = FUNC_BLOCK.matcher(template);
         StringBuffer funcBuf = new StringBuffer();
@@ -153,8 +175,7 @@ public class EasyLogParser implements BeanFactoryAware {
 
         // step3: if no placeholder matched but it is a plain expression, evaluate whole
         if (!funcMatched && !spelMatched && isPlainExpression(replaced)) {
-            Object v = safeEval(replaced, elementKey, ctx);
-            return v == null ? "" : String.valueOf(v);
+            return safeEval(replaced, elementKey, ctx);
         }
         return replaced;
     }
@@ -165,6 +186,34 @@ public class EasyLogParser implements BeanFactoryAware {
         }
         String trimmed = value.trim();
         return trimmed.startsWith(EasyLogConsts.POUND_KEY) || trimmed.startsWith("@") || trimmed.startsWith("T(");
+    }
+
+    private boolean isSingleFuncBlock(String value) {
+        if (value == null) {
+            return false;
+        }
+        Matcher matcher = FUNC_BLOCK.matcher(value);
+        if (!matcher.find()) {
+            return false;
+        }
+        if (matcher.start() != 0 || matcher.end() != value.length()) {
+            return false;
+        }
+        return !matcher.find();
+    }
+
+    private boolean isSingleSpelBlock(String value) {
+        if (value == null) {
+            return false;
+        }
+        Matcher matcher = SPEL_BLOCK.matcher(value);
+        if (!matcher.find()) {
+            return false;
+        }
+        if (matcher.start() != 0 || matcher.end() != value.length()) {
+            return false;
+        }
+        return !matcher.find();
     }
 
     private String applyFunction(String funcName, String arg) {

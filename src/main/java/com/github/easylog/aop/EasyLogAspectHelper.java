@@ -1,5 +1,6 @@
 package com.github.easylog.aop;
 
+import com.alibaba.fastjson2.JSON;
 import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.compare.Equator;
 import com.github.easylog.compare.FieldInfo;
@@ -124,7 +125,7 @@ final class EasyLogAspectHelper {
     /**
      * 根据模板渲染结果生成最终的日志实体列表（成功/失败、占位符、条件过滤、差异计算）。
      */
-    static List<EasyLogInfo> createEasyLogInfo(Map<String, String> templateMap,
+    static List<EasyLogInfo> createEasyLogInfo(Map<String, Object> templateMap,
                                                List<EasyLogOps> easyLogOpsList,
                                                MethodExecuteResult executeResult,
                                                IOperatorService operatorService) {
@@ -133,7 +134,7 @@ final class EasyLogAspectHelper {
             boolean shouldRecord = true;
             String conditionKey = easyLogOps.getCondition();
             if (!ObjectUtils.isEmpty(conditionKey)) {
-                String condVal = templateMap.get(conditionKey);
+                Object condVal = templateMap.get(conditionKey);
                 shouldRecord = Boolean.parseBoolean(String.valueOf(condVal));
             }
             if (!shouldRecord) {
@@ -141,20 +142,26 @@ final class EasyLogAspectHelper {
             }
             // 基础信息：是否记录、操作人/平台、模块、类型、业务标识、详情等
             EasyLogInfo easyLogInfo = new EasyLogInfo();
-            easyLogInfo.setCondition(ObjectUtils.isEmpty(conditionKey) ? "true" : templateMap.get(conditionKey));
-            String platform = templateMap.getOrDefault(easyLogOps.getPlatform(), operatorService.getPlatform());
+            easyLogInfo.setCondition(ObjectUtils.isEmpty(conditionKey) ? "true" : stringValueOrNull(templateMap.get(conditionKey)));
+            String platform = stringValueOrNull(templateMap.get(easyLogOps.getPlatform()));
+            if (ObjectUtils.isEmpty(platform)) {
+                platform = operatorService.getPlatform();
+            }
             easyLogInfo.setPlatform(platform);
-            String operator = templateMap.getOrDefault(easyLogOps.getOperator(), operatorService.getOperator());
+            String operator = stringValueOrNull(templateMap.get(easyLogOps.getOperator()));
+            if (ObjectUtils.isEmpty(operator)) {
+                operator = operatorService.getOperator();
+            }
             easyLogInfo.setOperator(operator);
 
             easyLogInfo.setModule(easyLogOps.getModule());
             easyLogInfo.setType(easyLogOps.getType());
-            easyLogInfo.setBizNo(templateMap.get(easyLogOps.getBizNo()));
-            String before = templateMap.get(easyLogOps.getBefore());
-            String after = templateMap.get(easyLogOps.getAfter());
-            easyLogInfo.setBefore(before);
-            easyLogInfo.setAfter(after);
-            easyLogInfo.setExtra(templateMap.get(easyLogOps.getExtra()));
+            easyLogInfo.setBizNo(stringValueOrNull(templateMap.get(easyLogOps.getBizNo())));
+            Object before = templateMap.get(easyLogOps.getBefore());
+            Object after = templateMap.get(easyLogOps.getAfter());
+            easyLogInfo.setBefore(stringValueOrNull(before));
+            easyLogInfo.setAfter(stringValueOrNull(after));
+            easyLogInfo.setExtra(stringValueOrNull(templateMap.get(easyLogOps.getExtra())));
             String contentKey = easyLogOps.getSuccess();
             String[] paramKeyList = easyLogOps.getSuccessParamList();
             if (!executeResult.isSuccess()) {
@@ -162,13 +169,10 @@ final class EasyLogAspectHelper {
                 contentKey = easyLogOps.getFail();
                 paramKeyList = easyLogOps.getFailParamList();
             }
-            easyLogInfo.setContent(templateMap.get(contentKey));
+            easyLogInfo.setContent(stringValueOrNull(templateMap.get(contentKey)));
             // 渲染内容参数，缺失时回退为空串以防 NPE
             String[] array = Arrays.stream(paramKeyList)
-                    .map(k -> {
-                        String v = templateMap.get(k);
-                        return v == null ? "" : v;
-                    })
+                    .map(k -> stringValue(templateMap.get(k)))
                     .toArray(String[]::new);
             easyLogInfo.setContentParam(array);
             // 差异详情：根据 before/after 生成字段级差异列表
@@ -178,10 +182,31 @@ final class EasyLogAspectHelper {
         return easyLogInfos;
     }
 
-    private static List<FieldInfo> getFieldInfoList(String before, String after) {
+    private static List<FieldInfo> getFieldInfoList(Object before, Object after) {
         if (ObjectUtils.isEmpty(before) && ObjectUtils.isEmpty(after)) {
             return Collections.emptyList();
         }
         return Equator.getDiffField(before, after);
+    }
+
+    private static String stringValue(Object value) {
+        if (value == null) {
+            return "";
+        }
+        if (value instanceof CharSequence) {
+            return value.toString();
+        }
+        try {
+            return JSON.toJSONString(value);
+        } catch (Exception ignore) {
+            return String.valueOf(value);
+        }
+    }
+
+    private static String stringValueOrNull(Object value) {
+        if (value == null) {
+            return null;
+        }
+        return stringValue(value);
     }
 }

@@ -129,7 +129,7 @@ public class EasyLogAspect {
 
         // 方法后逻辑：渲染模板 -> 生成日志 -> 落地
         try {
-            Map<String, String> templateMap = easyLogParser.processAfterExec(
+            Map<String, Object> templateMap = easyLogParser.processAfterExec(
                     expressTemplateList, customFunctionExecResultMap, method, args, targetClass,
                     executeResult.getErrMsg(), executeResult.getResult(), localVars);
 
