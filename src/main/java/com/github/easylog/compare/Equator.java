@@ -1,182 +1,117 @@
 package com.github.easylog.compare;
 
 import com.alibaba.fastjson2.JSON;
-import org.javers.core.Javers;
-import org.javers.core.JaversBuilder;
-import org.javers.core.diff.Change;
-import org.javers.core.diff.Diff;
-import org.javers.core.diff.ListCompareAlgorithm;
-import org.javers.core.diff.changetype.PropertyChange;
-import org.javers.core.diff.changetype.ReferenceChange;
-import org.javers.core.diff.changetype.ValueChange;
-import org.javers.core.diff.changetype.container.ContainerChange;
-import org.javers.core.diff.changetype.container.ContainerElementChange;
-import org.javers.core.diff.changetype.container.ElementValueChange;
-import org.javers.core.diff.changetype.container.ValueAdded;
-import org.javers.core.diff.changetype.container.ValueRemoved;
-import org.javers.core.diff.changetype.map.EntryAdded;
-import org.javers.core.diff.changetype.map.EntryChange;
-import org.javers.core.diff.changetype.map.EntryRemoved;
-import org.javers.core.diff.changetype.map.EntryValueChange;
-import org.javers.core.diff.changetype.map.MapChange;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
- * 使用 JaVers 对 JSON 对象进行差异对比，输出字段变更列表。
+ * 对对象进行浅层字段差异对比，输出字段变更列表。
  * <p>
  * 特性：
  * <ul>
- *     <li>忽略 List 顺序（SIMPLE 算法），便于对比表单类 JSON。</li>
- *     <li>保持原始值（字符串化）用于展示与存储。</li>
- *     <li>非 JSON 输入时退化为简单的旧/新值记录。</li>
+ *     <li>仅比较第一层字段，不展开嵌套对象。</li>
+ *     <li>List/Map 作为整体值比较。</li>
+ *     <li>非对象输入时退化为简单的旧/新值记录。</li>
  * </ul>
  * @author gaoshuanglong
  */
 public class Equator {
 
-    private static final Javers JAVERS_IGNORE_LIST_ORDER = JaversBuilder.javers()
-            .withListCompareAlgorithm(ListCompareAlgorithm.SIMPLE)
-            .build();
-
     public static List<FieldInfo> getDiffField(Object oldBean, Object newBean) {
-        // 1) 空输入直接返回空
         if (oldBean == null && newBean == null) {
             return Collections.emptyList();
         }
-        Object left = normalize(oldBean);
-        Object right = normalize(newBean);
-
-        // 2) 标量值或类型不兼容：回退为旧/新值
-        if (!isStructured(left) || !isStructured(right)) {
-            return fallbackScalar(oldBean, newBean);
+        if (oldBean == null || newBean == null) {
+            return Collections.singletonList(buildFieldInfo(null, oldBean, newBean));
         }
-        try {
-            Diff diff = JAVERS_IGNORE_LIST_ORDER.compare(left, right);
-            if (!diff.hasChanges()) {
-                return new ArrayList<>();
-            }
-
-            List<FieldInfo> list = new ArrayList<>();
-            for (Change change : diff.getChanges()) {
-                if (change instanceof ValueChange) {
-                    // 简单属性值变更
-                    ValueChange vc = (ValueChange) change;
-                    FieldInfo f = new FieldInfo();
-                    f.setFieldName(vc.getPropertyNameWithPath());
-                    f.setOldFieldVal(stringValue(vc.getLeft()));
-                    f.setNewFieldVal(stringValue(vc.getRight()));
-                    list.add(f);
-                } else if (change instanceof ReferenceChange) {
-                    // 引用对象变更（取左右对象，若不存在用 GlobalId）
-                    ReferenceChange rc = (ReferenceChange) change;
-                    FieldInfo f = new FieldInfo();
-                    f.setFieldName(rc.getPropertyNameWithPath());
-                    f.setOldFieldVal(stringValue(rc.getLeftObject().orElse(rc.getLeft())));
-                    f.setNewFieldVal(stringValue(rc.getRightObject().orElse(rc.getRight())));
-                    list.add(f);
-                } else if (change instanceof MapChange) {
-                    // Map 键值变化：新增/删除/值变更
-                    MapChange<?> mc = (MapChange<?>) change;
-                    String base = mc.getPropertyNameWithPath();
-                    for (EntryChange ec : mc.getEntryChanges()) {
-                        FieldInfo f = new FieldInfo();
-                        f.setFieldName(base + "[" + stringValue(ec.getKey()) + "]");
-                        if (ec instanceof EntryAdded) {
-                            f.setOldFieldVal("");
-                            f.setNewFieldVal(stringValue(((EntryAdded) ec).getValue()));
-                        } else if (ec instanceof EntryRemoved) {
-                            f.setOldFieldVal(stringValue(((EntryRemoved) ec).getValue()));
-                            f.setNewFieldVal("");
-                        } else if (ec instanceof EntryValueChange) {
-                            EntryValueChange evc = (EntryValueChange) ec;
-                            f.setOldFieldVal(stringValue(evc.getLeftValue()));
-                            f.setNewFieldVal(stringValue(evc.getRightValue()));
-                        } else {
-                            // 未知场景兜底
-                            f.setOldFieldVal(stringValue(mc.getLeft()));
-                            f.setNewFieldVal(stringValue(mc.getRight()));
-                        }
-                        list.add(f);
-                    }
-                } else if (change instanceof ContainerChange) {
-                    // List/Set 等集合：新增、删除、元素值变更
-                    ContainerChange<?> cc = (ContainerChange<?>) change;
-                    String base = cc.getPropertyNameWithPath();
-                    for (ValueAdded add : cc.getValueAddedChanges()) {
-                        FieldInfo f = new FieldInfo();
-                        f.setFieldName(appendIndex(base, add.getIndex(), "+"));
-                        f.setOldFieldVal("");
-                        f.setNewFieldVal(stringValue(add.getAddedValue()));
-                        list.add(f);
-                    }
-                    for (ValueRemoved rem : cc.getValueRemovedChanges()) {
-                        FieldInfo f = new FieldInfo();
-                        f.setFieldName(appendIndex(base, rem.getIndex(), "-"));
-                        f.setOldFieldVal(stringValue(rem.getRemovedValue()));
-                        f.setNewFieldVal("");
-                        list.add(f);
-                    }
-                    for (ContainerElementChange elementChange : cc.getChanges()) {
-                        if (elementChange instanceof ElementValueChange) {
-                            ElementValueChange evc = (ElementValueChange) elementChange;
-                            FieldInfo f = new FieldInfo();
-                            f.setFieldName(appendIndex(base, evc.getIndex(), null));
-                            f.setOldFieldVal(stringValue(evc.getLeftValue()));
-                            f.setNewFieldVal(stringValue(evc.getRightValue()));
-                            list.add(f);
-                        }
-                    }
-                } else if (change instanceof PropertyChange) {
-                    // 其他属性变更兜底
-                    PropertyChange pc = (PropertyChange) change;
-                    FieldInfo f = new FieldInfo();
-                    f.setFieldName(pc.getPropertyNameWithPath());
-                    f.setOldFieldVal(stringValue(pc.getLeft()));
-                    f.setNewFieldVal(stringValue(pc.getRight()));
-                    list.add(f);
-                }
-            }
-            return list;
-        } catch (Exception e) {
-            return fallbackScalar(oldBean, newBean);
+        if (isSimpleValue(oldBean) && isSimpleValue(newBean)) {
+            return Objects.equals(oldBean, newBean)
+                    ? Collections.emptyList()
+                    : Collections.singletonList(buildFieldInfo(null, oldBean, newBean));
         }
+        if (isMap(oldBean) || isMap(newBean)) {
+            if (oldBean instanceof Map && newBean instanceof Map) {
+                return diffTopLevelMap((Map<?, ?>) oldBean, (Map<?, ?>) newBean);
+            }
+            return Collections.singletonList(buildFieldInfo(null, oldBean, newBean));
+        }
+        if (isListLike(oldBean) || isListLike(newBean)) {
+            return containerEquals(oldBean, newBean)
+                    ? Collections.emptyList()
+                    : Collections.singletonList(buildFieldInfo(null, oldBean, newBean));
+        }
+        return diffTopLevelFields(oldBean, newBean);
     }
 
-    private static String appendIndex(String base, Integer idx, String suffixFlag) {
-        String suffix = idx == null ? (suffixFlag == null ? "[*]" : "[" + suffixFlag + "]") : "[" + idx + "]";
-        return base + suffix;
-    }
-
-    private static Object normalize(Object value) {
-        if (value == null) {
-            return null;
-        }
-        if (value instanceof CharSequence) {
-            String s = value.toString().trim();
+    private static List<FieldInfo> diffTopLevelFields(Object oldBean, Object newBean) {
+        List<FieldInfo> list = new ArrayList<>();
+        for (java.lang.reflect.Field oldField : getAllFields(oldBean.getClass())) {
+            java.lang.reflect.Field newField = getFieldByName(newBean.getClass(), oldField.getName());
+            if (newField == null) {
+                continue;
+            }
             try {
-                if (s.startsWith("[")) {
-                    return JSON.parseObject(s, List.class);
+                oldField.setAccessible(true);
+                newField.setAccessible(true);
+                Object oldValue = oldField.get(oldBean);
+                Object newValue = newField.get(newBean);
+                if (fieldValueEquals(oldValue, newValue)) {
+                    continue;
                 }
-                if (s.startsWith("{")) {
-                    return JSON.parseObject(s, Map.class);
-                }
-            } catch (Exception e) {
-                // ignore and fall back to raw string
+                list.add(buildFieldInfo(oldField.getName(), oldValue, newValue));
+            } catch (Exception ignore) {
+                // ignore bad fields to avoid breaking business flow
             }
-            return value.toString();
         }
-        return value;
+        return list;
     }
 
-    private static boolean isStructured(Object value) {
-        return value != null && !isScalar(value);
+    private static List<FieldInfo> diffTopLevelMap(Map<?, ?> oldMap, Map<?, ?> newMap) {
+        List<FieldInfo> list = new ArrayList<>();
+        java.util.Set<Object> keys = new java.util.LinkedHashSet<>();
+        keys.addAll(oldMap.keySet());
+        keys.addAll(newMap.keySet());
+        for (Object key : keys) {
+            Object oldValue = oldMap.get(key);
+            Object newValue = newMap.get(key);
+            if (fieldValueEquals(oldValue, newValue)) {
+                continue;
+            }
+            list.add(buildFieldInfo(stringValue(key), oldValue, newValue));
+        }
+        return list;
     }
 
-    private static boolean isScalar(Object value) {
+    private static FieldInfo buildFieldInfo(String fieldName, Object oldValue, Object newValue) {
+        FieldInfo fieldDiff = new FieldInfo();
+        fieldDiff.setFieldName(fieldName);
+        fieldDiff.setOldFieldVal(stringValue(oldValue));
+        fieldDiff.setNewFieldVal(stringValue(newValue));
+        return fieldDiff;
+    }
+
+    private static boolean fieldValueEquals(Object oldValue, Object newValue) {
+        if (oldValue == null && newValue == null) {
+            return true;
+        }
+        if (oldValue == null || newValue == null) {
+            return false;
+        }
+        if (isSimpleValue(oldValue) && isSimpleValue(newValue)) {
+            return Objects.equals(oldValue, newValue);
+        }
+        if (isMap(oldValue) || isMap(newValue) || isListLike(oldValue) || isListLike(newValue)) {
+            return containerEquals(oldValue, newValue);
+        }
+        return Objects.equals(stringValue(oldValue), stringValue(newValue));
+    }
+
+    private static boolean isSimpleValue(Object value) {
         return value == null
                 || value instanceof CharSequence
                 || value instanceof Number
@@ -187,11 +122,84 @@ public class Equator {
                 || value instanceof java.time.temporal.Temporal;
     }
 
-    private static List<FieldInfo> fallbackScalar(Object oldBean, Object newBean) {
-        FieldInfo fieldDiff = new FieldInfo();
-        fieldDiff.setOldFieldVal(stringValue(oldBean));
-        fieldDiff.setNewFieldVal(stringValue(newBean));
-        return Collections.singletonList(fieldDiff);
+    private static boolean isMap(Object value) {
+        return value instanceof Map;
+    }
+
+    private static boolean isListLike(Object value) {
+        return value != null && (value instanceof Iterable || value.getClass().isArray());
+    }
+
+    private static boolean containerEquals(Object oldValue, Object newValue) {
+        if (oldValue == null && newValue == null) {
+            return true;
+        }
+        if (oldValue == null || newValue == null) {
+            return false;
+        }
+        if (oldValue instanceof Map && newValue instanceof Map) {
+            return oldValue.equals(newValue);
+        }
+        if (oldValue instanceof Iterable && newValue instanceof Iterable) {
+            return oldValue.equals(newValue);
+        }
+        if (oldValue.getClass().isArray() && newValue.getClass().isArray()) {
+            return arrayEquals(oldValue, newValue);
+        }
+        return Objects.equals(stringValue(oldValue), stringValue(newValue));
+    }
+
+    private static boolean arrayEquals(Object oldValue, Object newValue) {
+        if (oldValue instanceof Object[] && newValue instanceof Object[]) {
+            return Arrays.deepEquals((Object[]) oldValue, (Object[]) newValue);
+        }
+        if (oldValue instanceof int[] && newValue instanceof int[]) {
+            return Arrays.equals((int[]) oldValue, (int[]) newValue);
+        }
+        if (oldValue instanceof long[] && newValue instanceof long[]) {
+            return Arrays.equals((long[]) oldValue, (long[]) newValue);
+        }
+        if (oldValue instanceof short[] && newValue instanceof short[]) {
+            return Arrays.equals((short[]) oldValue, (short[]) newValue);
+        }
+        if (oldValue instanceof byte[] && newValue instanceof byte[]) {
+            return Arrays.equals((byte[]) oldValue, (byte[]) newValue);
+        }
+        if (oldValue instanceof char[] && newValue instanceof char[]) {
+            return Arrays.equals((char[]) oldValue, (char[]) newValue);
+        }
+        if (oldValue instanceof boolean[] && newValue instanceof boolean[]) {
+            return Arrays.equals((boolean[]) oldValue, (boolean[]) newValue);
+        }
+        if (oldValue instanceof float[] && newValue instanceof float[]) {
+            return Arrays.equals((float[]) oldValue, (float[]) newValue);
+        }
+        if (oldValue instanceof double[] && newValue instanceof double[]) {
+            return Arrays.equals((double[]) oldValue, (double[]) newValue);
+        }
+        return Objects.equals(stringValue(oldValue), stringValue(newValue));
+    }
+
+    private static java.lang.reflect.Field[] getAllFields(Class<?> type) {
+        List<java.lang.reflect.Field> fields = new ArrayList<>();
+        for (Class<?> c = type; c != null && !c.isSynthetic(); c = c.getSuperclass()) {
+            for (java.lang.reflect.Field field : c.getDeclaredFields()) {
+                if (!field.isSynthetic()) {
+                    fields.add(field);
+                }
+            }
+        }
+        return fields.toArray(new java.lang.reflect.Field[0]);
+    }
+
+    private static java.lang.reflect.Field getFieldByName(Class<?> type, String fieldName) {
+        for (Class<?> c = type; c != null && !c.isSynthetic(); c = c.getSuperclass()) {
+            try {
+                return c.getDeclaredField(fieldName);
+            } catch (NoSuchFieldException ignored) {
+            }
+        }
+        return null;
     }
 
     private static String stringValue(Object value) {

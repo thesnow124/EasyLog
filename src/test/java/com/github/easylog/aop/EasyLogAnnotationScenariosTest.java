@@ -183,13 +183,10 @@ class EasyLogAnnotationScenariosTest {
             scenarioService.diff(request);
 
             EasyLogInfo info = singleLog();
-            assertEquals("{\"age\":1}", info.getBefore());
-            assertEquals("{\"age\":2}", info.getAfter());
             List<FieldInfo> fields = info.getFieldInfoList();
             assertEquals(1, fields.size());
-            assertTrue(fields.get(0).getFieldName().contains("age"));
-            assertEquals("1", fields.get(0).getOldFieldVal());
-            assertEquals("2", fields.get(0).getNewFieldVal());
+            assertEquals("{\"age\":1}", fields.get(0).getOldFieldVal());
+            assertEquals("{\"age\":2}", fields.get(0).getNewFieldVal());
         }
 
         @Test
@@ -199,11 +196,9 @@ class EasyLogAnnotationScenariosTest {
             scenarioService.diffObject(request);
 
             EasyLogInfo info = singleLog();
-            assertNotNull(info.getBefore());
-            assertNotNull(info.getAfter());
             List<FieldInfo> fields = info.getFieldInfoList();
             assertEquals(1, fields.size());
-            assertTrue(fields.get(0).getFieldName().contains("age"));
+            assertEquals("age", fields.get(0).getFieldName());
             assertEquals("1", fields.get(0).getOldFieldVal());
             assertEquals("2", fields.get(0).getNewFieldVal());
         }
@@ -216,9 +211,9 @@ class EasyLogAnnotationScenariosTest {
 
             EasyLogInfo info = singleLog();
             List<FieldInfo> fields = info.getFieldInfoList();
-            assertTrue(fields.stream().anyMatch(f -> "1".equals(f.getOldFieldVal()) && "2".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> "2".equals(f.getOldFieldVal()) && "3".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> "".equals(f.getOldFieldVal()) && "4".equals(f.getNewFieldVal())));
+            assertEquals(1, fields.size());
+            assertEquals("[1,2]", fields.get(0).getOldFieldVal());
+            assertEquals("[2,3,4]", fields.get(0).getNewFieldVal());
         }
 
         @Test
@@ -253,8 +248,7 @@ class EasyLogAnnotationScenariosTest {
 
             EasyLogInfo info = singleLog();
             List<FieldInfo> fields = info.getFieldInfoList();
-            assertTrue(fields.stream().anyMatch(f -> f.getFieldName() != null
-                    && f.getFieldName().contains("detail")
+            assertTrue(fields.stream().anyMatch(f -> "detail".equals(f.getFieldName())
                     && f.getOldFieldVal() != null
                     && f.getOldFieldVal().contains("old")
                     && f.getNewFieldVal() != null
@@ -269,9 +263,16 @@ class EasyLogAnnotationScenariosTest {
 
             EasyLogInfo info = singleLog();
             List<FieldInfo> fields = info.getFieldInfoList();
-            assertTrue(fields.stream().anyMatch(f -> "1".equals(f.getOldFieldVal()) && "".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> "2".equals(f.getOldFieldVal()) && "3".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> "".equals(f.getOldFieldVal()) && "4".equals(f.getNewFieldVal())));
+            assertEquals(3, fields.size());
+            assertTrue(fields.stream().anyMatch(f -> "a".equals(f.getFieldName())
+                    && "1".equals(f.getOldFieldVal())
+                    && "".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> "b".equals(f.getFieldName())
+                    && "2".equals(f.getOldFieldVal())
+                    && "3".equals(f.getNewFieldVal())));
+            assertTrue(fields.stream().anyMatch(f -> "c".equals(f.getFieldName())
+                    && "".equals(f.getOldFieldVal())
+                    && "4".equals(f.getNewFieldVal())));
         }
 
         @Test
@@ -282,8 +283,9 @@ class EasyLogAnnotationScenariosTest {
 
             EasyLogInfo info = singleLog();
             List<FieldInfo> fields = info.getFieldInfoList();
-            assertTrue(fields.stream().anyMatch(f -> "2".equals(f.getOldFieldVal()) && "3".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> "".equals(f.getOldFieldVal()) && "4".equals(f.getNewFieldVal())));
+            assertEquals(1, fields.size());
+            assertEquals("[1,2]", fields.get(0).getOldFieldVal());
+            assertEquals("[1,3,4]", fields.get(0).getNewFieldVal());
         }
 
         @Test
@@ -294,7 +296,9 @@ class EasyLogAnnotationScenariosTest {
 
             EasyLogInfo info = singleLog();
             List<FieldInfo> fields = info.getFieldInfoList();
-            assertTrue(fields.stream().anyMatch(f -> "2".equals(f.getOldFieldVal()) && "".equals(f.getNewFieldVal())));
+            assertEquals(1, fields.size());
+            assertEquals("[1,2]", fields.get(0).getOldFieldVal());
+            assertEquals("[1]", fields.get(0).getNewFieldVal());
         }
 
         @Test
@@ -305,12 +309,10 @@ class EasyLogAnnotationScenariosTest {
 
             EasyLogInfo info = singleLog();
             List<FieldInfo> fields = info.getFieldInfoList();
-            assertTrue(fields.stream().anyMatch(f -> "b".equals(f.getOldFieldVal()) && "c".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> "v1".equals(f.getOldFieldVal()) && "".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> "v2".equals(f.getOldFieldVal()) && "v3".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> "".equals(f.getOldFieldVal()) && "v4".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> f.getFieldName() != null && f.getFieldName().contains("objectList")));
-            assertTrue(fields.stream().anyMatch(f -> f.getFieldName() != null && f.getFieldName().contains("child")));
+            assertTrue(fields.stream().anyMatch(f -> "stringList".equals(f.getFieldName())));
+            assertTrue(fields.stream().anyMatch(f -> "objectList".equals(f.getFieldName())));
+            assertTrue(fields.stream().anyMatch(f -> "child".equals(f.getFieldName())));
+            assertTrue(fields.stream().anyMatch(f -> "attributes".equals(f.getFieldName())));
         }
     }
 
