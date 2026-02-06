@@ -2,9 +2,9 @@ package com.github.easylog.configuration;
 
 
 import com.github.easylog.aop.EasyLogAspect;
+import com.github.easylog.diff.DefaultDiffEngine;
+import com.github.easylog.diff.DiffEngine;
 import com.github.easylog.function.EasyLogParser;
-import com.github.easylog.function.ParseFunction;
-import com.github.easylog.function.ParseFunctionFactory;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
 import com.github.easylog.support.DefaultLogRecordServiceImpl;
@@ -25,7 +25,7 @@ import org.springframework.context.annotation.Role;
  * <p>
  * This class wires the following pieces when {@code easylog.enable=true} (default):
  * <ul>
- *     <li>Template parsing infrastructure ({@link com.github.easylog.function.EasyLogParser}) and the function registry.</li>
+ *     <li>Template parsing infrastructure ({@link com.github.easylog.function.EasyLogParser}).</li>
  *     <li>Default operator/provider beans that can be overridden by user beans.</li>
  *     <li>Log storage selection：in-memory log printing by default; override via {@link com.github.easylog.service.ILogRecordService}.</li>
  *     <li>AOP aspect that captures method invocations and renders operation logs.</li>
@@ -47,13 +47,14 @@ public class EasyLogAutoConfiguration {
     }
 
     @Bean
-    public ParseFunctionFactory parseFunctionFactory(java.util.List<ParseFunction> parseFunctions) {
-        return new ParseFunctionFactory(parseFunctions);
+    @ConditionalOnMissingBean(DiffEngine.class)
+    public DiffEngine diffEngine() {
+        return new DefaultDiffEngine(easyLogProperties);
     }
 
     @Bean
-    public EasyLogParser easyLogParser(ParseFunctionFactory parseFunctionFactory) {
-        return new EasyLogParser(parseFunctionFactory);
+    public EasyLogParser easyLogParser(DiffEngine diffEngine) {
+        return new EasyLogParser(diffEngine);
     }
 
     @Bean

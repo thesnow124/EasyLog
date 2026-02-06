@@ -1,8 +1,9 @@
 package com.github.easylog.aop;
 
 import com.github.easylog.annotation.EasyLog;
+import com.github.easylog.configuration.EasyLogProperties;
+import com.github.easylog.diff.DefaultDiffEngine;
 import com.github.easylog.function.EasyLogParser;
-import com.github.easylog.function.ParseFunctionFactory;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
@@ -14,7 +15,6 @@ import org.junit.jupiter.api.Test;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,7 +53,7 @@ class EasyLogAspectTest {
     @Test
     void aroundSuccessRecordsLog() throws Throwable {
         RecordingLogRecordService recordService = new RecordingLogRecordService();
-        EasyLogParser parser = new EasyLogParser(new ParseFunctionFactory(Arrays.asList()));
+        EasyLogParser parser = new EasyLogParser(new DefaultDiffEngine(new EasyLogProperties()));
         EasyLogAspect aspect = new EasyLogAspect(recordService, new FixedOperatorService(), parser, false);
 
         Target target = new Target();
@@ -77,7 +77,7 @@ class EasyLogAspectTest {
     @Test
     void aroundFailureRecordsAndRethrows() throws Exception {
         RecordingLogRecordService recordService = new RecordingLogRecordService();
-        EasyLogParser parser = new EasyLogParser(new ParseFunctionFactory(Arrays.asList()));
+        EasyLogParser parser = new EasyLogParser(new DefaultDiffEngine(new EasyLogProperties()));
         EasyLogAspect aspect = new EasyLogAspect(recordService, new FixedOperatorService(), parser, false);
 
         FailingTarget target = new FailingTarget();

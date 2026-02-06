@@ -1,5 +1,6 @@
 package com.github.easylog.context;
 
+import com.github.easylog.diff.DiffEngine;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.context.expression.AnnotatedElementKey;
 import org.springframework.context.expression.BeanFactoryResolver;
@@ -20,8 +21,10 @@ import java.util.concurrent.ConcurrentHashMap;
 public class EasyLogCachedExpressionEvaluator extends CachedExpressionEvaluator {
 
     private final Map<ExpressionKey, Expression> keyCache = new ConcurrentHashMap<>(64);
+    private final DiffEngine diffEngine;
 
-    public EasyLogCachedExpressionEvaluator() {
+    public EasyLogCachedExpressionEvaluator(DiffEngine diffEngine) {
+        this.diffEngine = diffEngine;
     }
 
     public EvaluationContext createEvaluationContext(Method method, Object[] args, BeanFactory beanFactory, String errMsg, Object result) {
@@ -34,8 +37,9 @@ public class EasyLogCachedExpressionEvaluator extends CachedExpressionEvaluator 
                                                      String errMsg,
                                                      Object result,
                                                      Map<String, Object> localVars) {
+        EasyLogSpelRoot root = new EasyLogSpelRoot(diffEngine);
         EasyLogEvaluationContext evaluationContext = new EasyLogEvaluationContext(
-                method, args, this.getParameterNameDiscoverer(), localVars);
+                root, method, args, this.getParameterNameDiscoverer(), localVars);
         evaluationContext.putResult(errMsg, result);
         if (beanFactory != null) {
             // setBeanResolver 主要用于支持SpEL模板中调用指定类的方法，如：@XXService.x(#root)

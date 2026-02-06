@@ -12,6 +12,7 @@ import java.util.Map;
  * <p>
  * 内部使用栈结构以支持嵌套的注解方法调用，避免变量互相覆盖/污染。push/pop 由切面控制，业务只需 put/get。
  * Note: ThreadLocal values do not propagate across async/thread-pool boundaries; pass values explicitly if needed.
+ * @author gaoshuanglong
  */
 public final class EasyLogContext {
 

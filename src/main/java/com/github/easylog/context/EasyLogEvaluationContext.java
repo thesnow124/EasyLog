@@ -15,14 +15,22 @@ import java.util.Map;
 public class EasyLogEvaluationContext extends MethodBasedEvaluationContext {
 
     public EasyLogEvaluationContext(Method method, Object[] arguments, ParameterNameDiscoverer parameterNameDiscoverer) {
-        this(method, arguments, parameterNameDiscoverer, null);
+        this(null, method, arguments, parameterNameDiscoverer, null);
     }
 
     public EasyLogEvaluationContext(Method method,
                                     Object[] arguments,
                                     ParameterNameDiscoverer parameterNameDiscoverer,
                                     Map<String, Object> localVars) {
-        super(null, method, arguments, parameterNameDiscoverer);
+        this(null, method, arguments, parameterNameDiscoverer, localVars);
+    }
+
+    public EasyLogEvaluationContext(Object rootObject,
+                                    Method method,
+                                    Object[] arguments,
+                                    ParameterNameDiscoverer parameterNameDiscoverer,
+                                    Map<String, Object> localVars) {
+        super(rootObject, method, arguments, parameterNameDiscoverer);
         Map<String, Object> vars = localVars != null ? localVars : EasyLogContext.getVariables();
         if (vars.isEmpty()) {
             return;

@@ -1,5 +1,7 @@
 package com.github.easylog.context;
 
+import com.github.easylog.configuration.EasyLogProperties;
+import com.github.easylog.diff.DefaultDiffEngine;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.support.DefaultListableBeanFactory;
@@ -35,7 +37,7 @@ class EasyLogCachedExpressionEvaluatorTest {
         EasyLogContext.push();
         EasyLogContext.put("extra", "x");
 
-        EasyLogCachedExpressionEvaluator evaluator = new EasyLogCachedExpressionEvaluator();
+        EasyLogCachedExpressionEvaluator evaluator = new EasyLogCachedExpressionEvaluator(new DefaultDiffEngine(new EasyLogProperties()));
         EvaluationContext ctx = evaluator.createEvaluationContext(method, new Object[]{"hi", 2}, null, "err", "res");
         AnnotatedElementKey key = new AnnotatedElementKey(method, Sample.class);
 
@@ -52,7 +54,7 @@ class EasyLogCachedExpressionEvaluatorTest {
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         beanFactory.registerSingleton("echoBean", new EchoBean());
 
-        EasyLogCachedExpressionEvaluator evaluator = new EasyLogCachedExpressionEvaluator();
+        EasyLogCachedExpressionEvaluator evaluator = new EasyLogCachedExpressionEvaluator(new DefaultDiffEngine(new EasyLogProperties()));
         EvaluationContext ctx = evaluator.createEvaluationContext(method, new Object[]{"hi", 2}, beanFactory, null, null);
         AnnotatedElementKey key = new AnnotatedElementKey(method, Sample.class);
 

@@ -2,11 +2,15 @@ package com.github.easylog.aop;
 
 import com.github.easylog.annotation.EasyLog;
 import com.github.easylog.annotation.EasyLogs;
-import com.github.easylog.compare.FieldInfo;
+import com.github.easylog.annotation.EasyLogDiffField;
+import com.github.easylog.annotation.EasyLogDiffObject;
+import com.github.easylog.configuration.EasyLogProperties;
 import com.github.easylog.context.EasyLogContext;
+import com.github.easylog.diff.DefaultDiffEngine;
+import com.github.easylog.diff.DiffDTO;
+import com.github.easylog.diff.DiffEngine;
+import com.github.easylog.diff.DiffFieldDTO;
 import com.github.easylog.function.EasyLogParser;
-import com.github.easylog.function.ParseFunction;
-import com.github.easylog.function.ParseFunctionFactory;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
@@ -26,8 +30,6 @@ import org.springframework.test.context.support.DependencyInjectionTestExecution
 import org.springframework.test.context.support.DirtiesContextTestExecutionListener;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -107,20 +109,10 @@ class EasyLogAnnotationScenariosTest {
     }
 
     @Nested
-    @DisplayName("Functions and Beans")
-    class FunctionsAndBeans {
+    @DisplayName("Beans and Context")
+    class BeansAndContext {
         @Test
-        void resolves_custom_function() {
-            ScenarioRequest request = ScenarioRequest.base().withOperator("alice");
-
-            scenarioService.upper(request);
-
-            EasyLogInfo info = singleLog();
-            assertEquals("upper ALICE", info.getContent());
-        }
-
-        @Test
-        void uses_before_function_value() {
+        void uses_context_old_value() {
             ScenarioRequest request = ScenarioRequest.base()
                     .withBizNo("B-200")
                     .withAddress("new-addr");
@@ -173,146 +165,36 @@ class EasyLogAnnotationScenariosTest {
     }
 
     @Nested
-    @DisplayName("Before/After Diff")
-    class BeforeAfterDiff {
+    @DisplayName("DiffKey")
+    class DiffKey {
         @Test
-        void builds_field_info_list_from_before_after_diff() {
-            ScenarioRequest request = ScenarioRequest.base()
-                    .withOldNew("{\"age\":1}", "{\"age\":2}");
-
-            scenarioService.diff(request);
-
-            EasyLogInfo info = singleLog();
-            List<FieldInfo> fields = info.getFieldInfoList();
-            assertEquals(1, fields.size());
-            assertEquals("{\"age\":1}", fields.get(0).getOldFieldVal());
-            assertEquals("{\"age\":2}", fields.get(0).getNewFieldVal());
-        }
-
-        @Test
-        void builds_field_info_list_from_before_after_object() {
+        void uses_diff_function_expression() {
             ScenarioRequest request = ScenarioRequest.base().withBizNo("B-201");
 
-            scenarioService.diffObject(request);
+            scenarioService.diffWithFunction(request);
 
             EasyLogInfo info = singleLog();
-            List<FieldInfo> fields = info.getFieldInfoList();
-            assertEquals(1, fields.size());
-            assertEquals("age", fields.get(0).getFieldName());
-            assertEquals("1", fields.get(0).getOldFieldVal());
-            assertEquals("2", fields.get(0).getNewFieldVal());
+            assertNotNull(info.getDiffDTO());
+            assertEquals(1, info.getDiffDTO().getDiffFieldDTOList().size());
+            DiffFieldDTO field = info.getDiffDTO().getDiffFieldDTOList().get(0);
+            assertEquals("age", field.getFieldName());
+            assertEquals(1, field.getOldValue());
+            assertEquals(2, field.getNewValue());
         }
 
         @Test
-        void builds_field_info_list_from_array_before_after() {
-            ScenarioRequest request = ScenarioRequest.base().withOldNew("[1,2]", "[2,3,4]");
-
-            scenarioService.diff(request);
-
-            EasyLogInfo info = singleLog();
-            List<FieldInfo> fields = info.getFieldInfoList();
-            assertEquals(1, fields.size());
-            assertEquals("[1,2]", fields.get(0).getOldFieldVal());
-            assertEquals("[2,3,4]", fields.get(0).getNewFieldVal());
-        }
-
-        @Test
-        void builds_field_info_list_from_scalar_before_after() {
-            ScenarioRequest request = ScenarioRequest.base().withOldNew("1", "2");
-
-            scenarioService.diff(request);
-
-            EasyLogInfo info = singleLog();
-            List<FieldInfo> fields = info.getFieldInfoList();
-            assertTrue(fields.stream().anyMatch(f -> "1".equals(f.getOldFieldVal()) && "2".equals(f.getNewFieldVal())));
-        }
-
-        @Test
-        void falls_back_for_non_json_before_after() {
-            ScenarioRequest request = ScenarioRequest.base().withOldNew("plain", "next");
-
-            scenarioService.diff(request);
-
-            EasyLogInfo info = singleLog();
-            List<FieldInfo> fields = info.getFieldInfoList();
-            assertEquals(1, fields.size());
-            assertEquals("plain", fields.get(0).getOldFieldVal());
-            assertEquals("next", fields.get(0).getNewFieldVal());
-        }
-
-        @Test
-        void builds_field_info_list_from_reference_object() {
+        void uses_diff_from_context_key() {
             ScenarioRequest request = ScenarioRequest.base().withBizNo("B-202");
 
-            scenarioService.diffRefObject(request);
+            scenarioService.diffWithContext(request);
 
             EasyLogInfo info = singleLog();
-            List<FieldInfo> fields = info.getFieldInfoList();
-            assertTrue(fields.stream().anyMatch(f -> "detail".equals(f.getFieldName())
-                    && f.getOldFieldVal() != null
-                    && f.getOldFieldVal().contains("old")
-                    && f.getNewFieldVal() != null
-                    && f.getNewFieldVal().contains("new")));
-        }
-
-        @Test
-        void builds_field_info_list_from_map_entry_changes() {
-            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-203");
-
-            scenarioService.diffMap(request);
-
-            EasyLogInfo info = singleLog();
-            List<FieldInfo> fields = info.getFieldInfoList();
-            assertEquals(3, fields.size());
-            assertTrue(fields.stream().anyMatch(f -> "a".equals(f.getFieldName())
-                    && "1".equals(f.getOldFieldVal())
-                    && "".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> "b".equals(f.getFieldName())
-                    && "2".equals(f.getOldFieldVal())
-                    && "3".equals(f.getNewFieldVal())));
-            assertTrue(fields.stream().anyMatch(f -> "c".equals(f.getFieldName())
-                    && "".equals(f.getOldFieldVal())
-                    && "4".equals(f.getNewFieldVal())));
-        }
-
-        @Test
-        void builds_field_info_list_from_list_element_change_and_add() {
-            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-204");
-
-            scenarioService.diffListAdd(request);
-
-            EasyLogInfo info = singleLog();
-            List<FieldInfo> fields = info.getFieldInfoList();
-            assertEquals(1, fields.size());
-            assertEquals("[1,2]", fields.get(0).getOldFieldVal());
-            assertEquals("[1,3,4]", fields.get(0).getNewFieldVal());
-        }
-
-        @Test
-        void builds_field_info_list_from_list_element_remove() {
-            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-205");
-
-            scenarioService.diffListRemove(request);
-
-            EasyLogInfo info = singleLog();
-            List<FieldInfo> fields = info.getFieldInfoList();
-            assertEquals(1, fields.size());
-            assertEquals("[1,2]", fields.get(0).getOldFieldVal());
-            assertEquals("[1]", fields.get(0).getNewFieldVal());
-        }
-
-        @Test
-        void builds_field_info_list_from_complex_object_fields() {
-            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-206");
-
-            scenarioService.diffAllFields(request);
-
-            EasyLogInfo info = singleLog();
-            List<FieldInfo> fields = info.getFieldInfoList();
-            assertTrue(fields.stream().anyMatch(f -> "stringList".equals(f.getFieldName())));
-            assertTrue(fields.stream().anyMatch(f -> "objectList".equals(f.getFieldName())));
-            assertTrue(fields.stream().anyMatch(f -> "child".equals(f.getFieldName())));
-            assertTrue(fields.stream().anyMatch(f -> "attributes".equals(f.getFieldName())));
+            assertNotNull(info.getDiffDTO());
+            assertEquals(1, info.getDiffDTO().getDiffFieldDTOList().size());
+            DiffFieldDTO field = info.getDiffDTO().getDiffFieldDTOList().get(0);
+            assertEquals("name", field.getFieldName());
+            assertEquals("old", field.getOldValue());
+            assertEquals("new", field.getNewValue());
         }
     }
 
@@ -385,23 +267,18 @@ class EasyLogAnnotationScenariosTest {
         }
 
         @Bean
-        ParseFunction upperFunction() {
-            return new UpperFunction();
+        EasyLogProperties easyLogProperties() {
+            return new EasyLogProperties();
         }
 
         @Bean
-        ParseFunction oldValueFunction(ScenarioStore scenarioStore) {
-            return new OldValueFunction(scenarioStore);
+        DiffEngine diffEngine(EasyLogProperties properties) {
+            return new DefaultDiffEngine(properties);
         }
 
         @Bean
-        ParseFunctionFactory parseFunctionFactory(List<ParseFunction> parseFunctions) {
-            return new ParseFunctionFactory(parseFunctions);
-        }
-
-        @Bean
-        EasyLogParser easyLogParser(ParseFunctionFactory parseFunctionFactory) {
-            return new EasyLogParser(parseFunctionFactory);
+        EasyLogParser easyLogParser(DiffEngine diffEngine) {
+            return new EasyLogParser(diffEngine);
         }
 
         @Bean
@@ -424,7 +301,7 @@ class EasyLogAnnotationScenariosTest {
                 operator = "{{#request.operator}}",
                 module = "user",
                 type = "UPDATE",
-                bizNo = "{{#request.bizNo}}",
+                bizNo = "#request.bizNo",
                 success = "hello {{#request.operator}} at {{#request.address}} result {{#_result}}"
         )
         public String basic(ScenarioRequest request) {
@@ -444,7 +321,7 @@ class EasyLogAnnotationScenariosTest {
         @EasyLog(
                 module = "user",
                 type = "UPDATE",
-                bizNo = "{{#request.bizNo}}",
+                bizNo = "#request.bizNo",
                 success = "ok",
                 condition = "{{#request.enabled}}"
         )
@@ -468,26 +345,12 @@ class EasyLogAnnotationScenariosTest {
                 module = "user",
                 type = "UPDATE",
                 bizNo = "{{#request.bizNo}}",
-                before = "{{#request.oldJson}}",
-                after = "{{#request.newJson}}",
+                diffKey = "{{DIFF(#oldObj,#newObj)}}",
                 success = "diff"
         )
-        public void diff(ScenarioRequest request) {
-        }
-
-        @EasyLog(
-                module = "user",
-                type = "UPDATE",
-                bizNo = "{{#request.bizNo}}",
-                before = "{{#oldObj}}",
-                after = "{{#newObj}}",
-                success = "diff-obj"
-        )
-        public void diffObject(ScenarioRequest request) {
-            Map<String, Object> oldObj = new HashMap<>();
-            oldObj.put("age", 1);
-            Map<String, Object> newObj = new HashMap<>();
-            newObj.put("age", 2);
+        public void diffWithFunction(ScenarioRequest request) {
+            DiffUser oldObj = new DiffUser(1, "same");
+            DiffUser newObj = new DiffUser(2, "same");
             EasyLogContext.put("oldObj", oldObj);
             EasyLogContext.put("newObj", newObj);
         }
@@ -496,121 +359,17 @@ class EasyLogAnnotationScenariosTest {
                 module = "user",
                 type = "UPDATE",
                 bizNo = "{{#request.bizNo}}",
-                before = "{{#oldRef}}",
-                after = "{{#newRef}}",
-                success = "diff-ref"
+                diffKey = "diff",
+                success = "diff-manual"
         )
-        public void diffRefObject(ScenarioRequest request) {
-            EasyLogContext.put("oldRef", new RefObject("old"));
-            EasyLogContext.put("newRef", new RefObject("new"));
-        }
-
-        @EasyLog(
-                module = "user",
-                type = "UPDATE",
-                bizNo = "{{#request.bizNo}}",
-                before = "{{#oldMap}}",
-                after = "{{#newMap}}",
-                success = "diff-map"
-        )
-        public void diffMap(ScenarioRequest request) {
-            Map<String, Object> oldMap = new HashMap<>();
-            oldMap.put("a", 1);
-            oldMap.put("b", 2);
-            Map<String, Object> newMap = new HashMap<>();
-            newMap.put("b", 3);
-            newMap.put("c", 4);
-            EasyLogContext.put("oldMap", oldMap);
-            EasyLogContext.put("newMap", newMap);
-        }
-
-        @EasyLog(
-                module = "user",
-                type = "UPDATE",
-                bizNo = "{{#request.bizNo}}",
-                before = "{{#oldList}}",
-                after = "{{#newList}}",
-                success = "diff-list-add"
-        )
-        public void diffListAdd(ScenarioRequest request) {
-            List<Integer> oldList = new ArrayList<>();
-            oldList.add(1);
-            oldList.add(2);
-            List<Integer> newList = new ArrayList<>();
-            newList.add(1);
-            newList.add(3);
-            newList.add(4);
-            EasyLogContext.put("oldList", oldList);
-            EasyLogContext.put("newList", newList);
-        }
-
-        @EasyLog(
-                module = "user",
-                type = "UPDATE",
-                bizNo = "{{#request.bizNo}}",
-                before = "{{#oldList}}",
-                after = "{{#newList}}",
-                success = "diff-list-remove"
-        )
-        public void diffListRemove(ScenarioRequest request) {
-            List<Integer> oldList = new ArrayList<>();
-            oldList.add(1);
-            oldList.add(2);
-            List<Integer> newList = new ArrayList<>();
-            newList.add(1);
-            EasyLogContext.put("oldList", oldList);
-            EasyLogContext.put("newList", newList);
-        }
-
-        @EasyLog(
-                module = "user",
-                type = "UPDATE",
-                bizNo = "{{#request.bizNo}}",
-                before = "{{#oldAll}}",
-                after = "{{#newAll}}",
-                success = "diff-all"
-        )
-        public void diffAllFields(ScenarioRequest request) {
-            HashMap<String, Object> oldChildAttrs = new HashMap<>();
-            oldChildAttrs.put("ck", "cv1");
-            AllFieldObjects oldChild = new AllFieldObjects(
-                    new ArrayList<>(Arrays.asList("c1", "c2")),
-                    new ArrayList<>(),
-                    null,
-                    oldChildAttrs
-            );
-
-            HashMap<String, Object> newChildAttrs = new HashMap<>();
-            newChildAttrs.put("ck", "cv2");
-            AllFieldObjects newChild = new AllFieldObjects(
-                    new ArrayList<>(Arrays.asList("c1", "c3")),
-                    new ArrayList<>(),
-                    null,
-                    newChildAttrs
-            );
-
-            HashMap<String, Object> oldAttrs = new HashMap<>();
-            oldAttrs.put("k1", "v1");
-            oldAttrs.put("k2", "v2");
-            AllFieldObjects oldAll = new AllFieldObjects(
-                    new ArrayList<>(Arrays.asList("a", "b")),
-                    new ArrayList<>(Arrays.asList(oldChild)),
-                    oldChild,
-                    oldAttrs
-            );
-
-            HashMap<String, Object> newAttrs = new HashMap<>();
-            newAttrs.put("k2", "v3");
-            newAttrs.put("k3", "v4");
-            AllFieldObjects newAll = new AllFieldObjects(
-                    new ArrayList<>(Arrays.asList("a", "c", "d")),
-                    new ArrayList<>(Arrays.asList(newChild, oldChild)),
-                    newChild,
-                    newAttrs
-            );
-
-            EasyLogContext.put("oldAll", oldAll);
-            EasyLogContext.put("newAll", newAll);
+        public void diffWithContext(ScenarioRequest request) {
+            DiffDTO diffDTO = new DiffDTO();
+            DiffFieldDTO field = new DiffFieldDTO();
+            field.setFieldName("name");
+            field.setOldValue("old");
+            field.setNewValue("new");
+            diffDTO.setDiffFieldDTOList(java.util.Collections.singletonList(field));
+            EasyLogContext.put("diff", diffDTO);
         }
 
 
@@ -625,20 +384,12 @@ class EasyLogAnnotationScenariosTest {
 
         @EasyLog(
                 module = "user",
-                type = "READ",
-                bizNo = "{{#request.bizNo}}",
-                success = "upper {upper{#request.operator}}"
-        )
-        public void upper(ScenarioRequest request) {
-        }
-
-        @EasyLog(
-                module = "user",
                 type = "UPDATE",
                 bizNo = "{{#request.bizNo}}",
-                success = "old {oldValue{#request.bizNo}} new {{#request.address}}"
+                success = "old {{#oldAddr}} new {{#request.address}}"
         )
         public void updateAddress(ScenarioRequest request) {
+            EasyLogContext.put("oldAddr", store.get(request.getBizNo()));
             store.put(request.getBizNo(), request.getAddress());
         }
 
@@ -678,8 +429,6 @@ class EasyLogAnnotationScenariosTest {
         private String platform;
         private String address;
         private boolean enabled = true;
-        private String oldJson;
-        private String newJson;
         private String labelId;
 
         static ScenarioRequest base() {
@@ -689,8 +438,6 @@ class EasyLogAnnotationScenariosTest {
             request.platform = "web";
             request.address = "road-0";
             request.labelId = "L-0";
-            request.oldJson = "{\"age\":1}";
-            request.newJson = "{\"age\":2}";
             return request;
         }
 
@@ -719,12 +466,6 @@ class EasyLogAnnotationScenariosTest {
             return this;
         }
 
-        ScenarioRequest withOldNew(String oldJson, String newJson) {
-            this.oldJson = oldJson;
-            this.newJson = newJson;
-            return this;
-        }
-
         ScenarioRequest withLabelId(String labelId) {
             this.labelId = labelId;
             return this;
@@ -750,73 +491,28 @@ class EasyLogAnnotationScenariosTest {
             return enabled;
         }
 
-        public String getOldJson() {
-            return oldJson;
-        }
-
-        public String getNewJson() {
-            return newJson;
-        }
-
         public String getLabelId() {
             return labelId;
         }
     }
 
-    static class RefObject {
-        private final RefDetail detail;
+    @EasyLogDiffObject(alias = "user")
+    static class DiffUser {
+        @EasyLogDiffField(alias = "年龄")
+        private final int age;
+        private final String name;
 
-        RefObject(String code) {
-            this.detail = new RefDetail(code);
+        DiffUser(int age, String name) {
+            this.age = age;
+            this.name = name;
         }
 
-        public RefDetail getDetail() {
-            return detail;
-        }
-    }
-
-    static class RefDetail {
-        private final String code;
-
-        RefDetail(String code) {
-            this.code = code;
+        public int getAge() {
+            return age;
         }
 
-        public String getCode() {
-            return code;
-        }
-    }
-
-    static class AllFieldObjects {
-        private final List<String> stringList;
-        private final List<AllFieldObjects> objectList;
-        private final AllFieldObjects child;
-        private final HashMap<String, Object> attributes;
-
-        AllFieldObjects(List<String> stringList,
-                        List<AllFieldObjects> objectList,
-                        AllFieldObjects child,
-                        HashMap<String, Object> attributes) {
-            this.stringList = stringList;
-            this.objectList = objectList;
-            this.child = child;
-            this.attributes = attributes;
-        }
-
-        public List<String> getStringList() {
-            return stringList;
-        }
-
-        public List<AllFieldObjects> getObjectList() {
-            return objectList;
-        }
-
-        public AllFieldObjects getChild() {
-            return child;
-        }
-
-        public HashMap<String, Object> getAttributes() {
-            return attributes;
+        public String getName() {
+            return name;
         }
     }
 
@@ -871,42 +567,6 @@ class EasyLogAnnotationScenariosTest {
 
         List<EasyLogInfo> snapshot() {
             return new ArrayList<>(logs);
-        }
-    }
-
-    static class UpperFunction implements ParseFunction {
-        @Override
-        public String functionName() {
-            return "upper";
-        }
-
-        @Override
-        public String apply(String value) {
-            return value == null ? "" : value.toUpperCase();
-        }
-    }
-
-    static class OldValueFunction implements ParseFunction {
-        private final ScenarioStore store;
-
-        OldValueFunction(ScenarioStore store) {
-            this.store = store;
-        }
-
-        @Override
-        public String functionName() {
-            return "oldValue";
-        }
-
-        @Override
-        public String apply(String value) {
-            String oldValue = store.get(value);
-            return oldValue == null ? "" : oldValue;
-        }
-
-        @Override
-        public boolean executeBefore() {
-            return true;
         }
     }
 }

@@ -1,9 +1,8 @@
 package com.github.easylog.model;
 
 
-import com.github.easylog.compare.FieldInfo;
+import com.github.easylog.diff.DiffDTO;
 
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -101,24 +100,14 @@ public class EasyLogInfo {
 
 
     /**
-     * 变更前快照（用于字段差异对比）
-     */
-    private String before;
-
-    /**
-     * 变更后快照（用于字段差异对比）
-     */
-    private String after;
-
-    /**
      * 额外扩展信息（不参与字段差异对比）
      */
     private String extra;
 
     /**
-     * 详细的字段变更
+     * 结构化Diff明细
      */
-    private List<FieldInfo> fieldInfoList;
+    private DiffDTO diffDTO;
 
     /**
      * 记录条件
@@ -269,22 +258,6 @@ public class EasyLogInfo {
         this.stackTrace = stackTrace;
     }
 
-    public String getBefore() {
-        return before;
-    }
-
-    public void setBefore(String before) {
-        this.before = before;
-    }
-
-    public String getAfter() {
-        return after;
-    }
-
-    public void setAfter(String after) {
-        this.after = after;
-    }
-
     public String getExtra() {
         return extra;
     }
@@ -293,12 +266,12 @@ public class EasyLogInfo {
         this.extra = extra;
     }
 
-    public List<FieldInfo> getFieldInfoList() {
-        return fieldInfoList;
+    public DiffDTO getDiffDTO() {
+        return diffDTO;
     }
 
-    public void setFieldInfoList(List<FieldInfo> fieldInfoList) {
-        this.fieldInfoList = fieldInfoList;
+    public void setDiffDTO(DiffDTO diffDTO) {
+        this.diffDTO = diffDTO;
     }
 
     public String getCondition() {

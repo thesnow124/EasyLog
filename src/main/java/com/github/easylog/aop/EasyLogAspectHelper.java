@@ -2,8 +2,7 @@ package com.github.easylog.aop;
 
 import com.alibaba.fastjson2.JSON;
 import com.github.easylog.annotation.EasyLog;
-import com.github.easylog.compare.Equator;
-import com.github.easylog.compare.FieldInfo;
+import com.github.easylog.diff.DiffDTO;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
@@ -14,7 +13,6 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -42,28 +40,26 @@ final class EasyLogAspectHelper {
         easyLogOps.setOperator(easyLog.operator());
         easyLogOps.setBizNo(easyLog.bizNo());
         easyLogOps.setPlatform(easyLog.platform());
-        easyLogOps.setBefore(easyLog.before());
-        easyLogOps.setAfter(easyLog.after());
+        easyLogOps.setDiffKey(easyLog.diffKey());
         easyLogOps.setExtra(easyLog.extra());
         easyLogOps.setCondition(easyLog.condition());
         return easyLogOps;
     }
 
     /**
-     * 收集所有需要解析的模板片段（SpEL、自定义函数、条件等），用于统一前/后置渲染。
+     * 收集所有需要解析的模板片段（SpEL、条件等），用于统一前/后置渲染。
      */
     static List<String> getExpressTemplate(List<EasyLogOps> easyLogOpsList) {
         Set<String> set = new HashSet<>();
         for (EasyLogOps easyLogOps : easyLogOpsList) {
             set.addAll(java.util.Arrays.asList(
                     easyLogOps.getBizNo(),
-                    easyLogOps.getBefore(),
-                    easyLogOps.getAfter(),
                     easyLogOps.getExtra(),
                     easyLogOps.getOperator(),
                     easyLogOps.getPlatform(),
                     easyLogOps.getSuccess(),
                     easyLogOps.getFail(),
+                    easyLogOps.getDiffKey(),
                     easyLogOps.getCondition()
             ));
             set.addAll(Arrays.asList(easyLogOps.getSuccessParamList()));
@@ -128,7 +124,8 @@ final class EasyLogAspectHelper {
     static List<EasyLogInfo> createEasyLogInfo(Map<String, Object> templateMap,
                                                List<EasyLogOps> easyLogOpsList,
                                                MethodExecuteResult executeResult,
-                                               IOperatorService operatorService) {
+                                               IOperatorService operatorService,
+                                               Map<String, Object> localVars) {
         List<EasyLogInfo> easyLogInfos = new ArrayList<>();
         for (EasyLogOps easyLogOps : easyLogOpsList) {
             boolean shouldRecord = true;
@@ -157,10 +154,8 @@ final class EasyLogAspectHelper {
             easyLogInfo.setModule(easyLogOps.getModule());
             easyLogInfo.setType(easyLogOps.getType());
             easyLogInfo.setBizNo(stringValueOrNull(templateMap.get(easyLogOps.getBizNo())));
-            Object before = templateMap.get(easyLogOps.getBefore());
-            Object after = templateMap.get(easyLogOps.getAfter());
-            easyLogInfo.setBefore(stringValueOrNull(before));
-            easyLogInfo.setAfter(stringValueOrNull(after));
+            DiffDTO diffDTO = resolveDiffDTO(templateMap, localVars, easyLogOps.getDiffKey());
+            easyLogInfo.setDiffDTO(diffDTO);
             easyLogInfo.setExtra(stringValueOrNull(templateMap.get(easyLogOps.getExtra())));
             String contentKey = easyLogOps.getSuccess();
             String[] paramKeyList = easyLogOps.getSuccessParamList();
@@ -175,18 +170,36 @@ final class EasyLogAspectHelper {
                     .map(k -> stringValue(templateMap.get(k)))
                     .toArray(String[]::new);
             easyLogInfo.setContentParam(array);
-            // 差异详情：根据 before/after 生成字段级差异列表
-            easyLogInfo.setFieldInfoList(getFieldInfoList(before, after));
             easyLogInfos.add(easyLogInfo);
         }
         return easyLogInfos;
     }
 
-    private static List<FieldInfo> getFieldInfoList(Object before, Object after) {
-        if (ObjectUtils.isEmpty(before) && ObjectUtils.isEmpty(after)) {
-            return Collections.emptyList();
+    private static DiffDTO resolveDiffDTO(Map<String, Object> templateMap,
+                                          Map<String, Object> localVars,
+                                          String diffKey) {
+        if (ObjectUtils.isEmpty(diffKey)) {
+            return null;
         }
-        return Equator.getDiffField(before, after);
+        Object diffVal = templateMap.get(diffKey);
+        if (diffVal instanceof DiffDTO) {
+            return (DiffDTO) diffVal;
+        }
+        if (diffVal instanceof String) {
+            DiffDTO fromKey = lookupDiff(localVars, (String) diffVal);
+            if (fromKey != null) {
+                return fromKey;
+            }
+        }
+        return lookupDiff(localVars, diffKey);
+    }
+
+    private static DiffDTO lookupDiff(Map<String, Object> localVars, String key) {
+        if (ObjectUtils.isEmpty(key) || localVars == null) {
+            return null;
+        }
+        Object val = localVars.get(key);
+        return val instanceof DiffDTO ? (DiffDTO) val : null;
     }
 
     private static String stringValue(Object value) {

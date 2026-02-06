@@ -6,7 +6,7 @@ EasyLog 是一个轻量级、基于注解的操作日志 SDK，面向 Spring Boo
 - 注解驱动（`@EasyLog`，可通过 `@EasyLogs` 重复声明）。
 - SpEL 模板渲染（方法参数、返回值、异常信息、Spring Bean 调用）。
 - 自定义函数，支持“前置执行”（用于查询旧值）。
-- 支持 before/after 差异对比（JSON/对象对比，基于 JaVers）。
+- 支持 diffKey 结构化差异对比（DiffDTO，字段级别名/忽略）。
 - 上下文变量 `EasyLogContext`（用于方法参数之外的数据）。
 - 可插拔的操作者/平台服务与日志存储服务。
 - 事务场景可选“提交后记录”。
@@ -44,17 +44,18 @@ import com.github.easylog.context.EasyLogContext;
     bizNo = "{{#request.orderNo}}",
     success = "update address from ${} to ${}",
     successParamList = {"{{#oldAddr}}", "{{#request.address}}"},
-    before = "{{#oldAddr}}",
-    after = "{{#request.address}}"
+    diffKey = "{{DIFF(#oldObj,#newObj)}}"
 )
 public void updateAddress(UpdateRequest request) {
     EasyLogContext.put("oldAddr", queryOldAddress(request.getOrderNo()));
+    EasyLogContext.put("oldObj", queryOldAddress(request.getOrderNo()));
+    EasyLogContext.put("newObj", request);
     // 业务逻辑...
 }
 ```
 
 ### 模板语法
-EasyLog 支持三类占位：
+EasyLog 支持两类表达式 + 顺序占位：
 
 1. **SpEL 块**：`{{ ... }}`
    - 示例：`"hello {{#request.operator}}"`
@@ -63,11 +64,7 @@ EasyLog 支持三类占位：
      - `#_errMsg`：异常信息
    - 支持调用 Spring Bean：`{{@labelService.label(#request.labelId)}}`
 
-2. **自定义函数块**：`{funcName{ SpEL }}`
-   - 示例：`"old {oldValue{#request.orderNo}}"`
-   - 函数通过实现 `ParseFunction` 定义。
-
-3. **纯表达式**：`#arg`、`@bean.method(..)`、`T(Class).method(..)`
+2. **纯表达式**：`#arg`、`@bean.method(..)`、`T(Class).method(..)`
    - 当模板本身就是表达式时，直接求值。
 
 ### 占位符参数
@@ -91,19 +88,30 @@ EasyLog 支持三类占位：
 )
 ```
 
-### before/after 差异对比
-使用 `before` / `after` 生成字段级差异：
+### diffKey 差异对比
+使用 `diffKey` 生成结构化差异（DiffDTO），支持固定 key 或表达式：
 
 ```java
 @EasyLog(
-    before = "{{#oldJson}}",
-    after = "{{#newJson}}",
+    diffKey = "{{DIFF(#oldObj,#newObj)}}",
     success = "diff"
 )
 ```
 
-当值为 JSON（字符串或对象）时，EasyLog 使用 JaVers 生成字段变更列表；
-非 JSON 则退化为简单旧/新值对比。
+Diff 结果会落在 `EasyLogInfo.diffDTO`，业务系统可自行拼接文案。
+
+字段别名/忽略可通过注解控制：
+
+```java
+@EasyLogDiffObject(alias = "user")
+class User {
+    @EasyLogDiffField(alias = "姓名")
+    private String name;
+
+    @EasyLogDiffField(alias = "年龄")
+    private Integer age;
+}
+```
 
 ### 一个方法记录多条日志
 
@@ -141,30 +149,17 @@ public ILogRecordService logRecordService() {
 }
 ```
 
-### 自定义函数
+### 内置 DIFF
+
+Diff 使用内置函数 `DIFF`：
 
 ```java
-@Bean
-public ParseFunction upper() {
-    return new ParseFunction() {
-        public String functionName() { return "upper"; }
-        public String apply(String value) { return value == null ? "" : value.toUpperCase(); }
-    };
-}
+@EasyLog(
+    diffKey = "{{DIFF(#oldObj,#newObj)}}"
+)
 ```
 
-如果需要在业务方法执行前取值：
-
-```java
-@Bean
-public ParseFunction oldValue(Store store) {
-    return new ParseFunction() {
-        public String functionName() { return "oldValue"; }
-        public String apply(String value) { return store.get(value); }
-        public boolean executeBefore() { return true; }
-    };
-}
-```
+如需“旧值”，请在业务内先写入 `EasyLogContext`，再在模板中通过 `{{#oldValue}}` 引用。
 
 ## 依赖说明
 
@@ -185,6 +180,12 @@ easylog.store=log
 
 # 若存在事务，是否在事务提交后再记录（默认 false）
 easylog.after-commit=false
+
+# Diff时是否忽略旧对象为null的字段（默认 false）
+easylog.diff-ignore-old-object-null-value=false
+
+# Diff时是否忽略新对象为null的字段（默认 false）
+easylog.diff-ignore-new-object-null-value=false
 ```
 
 ## 说明

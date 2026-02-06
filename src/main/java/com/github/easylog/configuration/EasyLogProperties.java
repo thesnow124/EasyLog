@@ -31,6 +31,16 @@ public class EasyLogProperties {
      */
     private boolean afterCommit = false;
 
+    /**
+     * Diff时是否忽略旧对象为null的字段
+     */
+    private boolean diffIgnoreOldObjectNullValue = false;
+
+    /**
+     * Diff时是否忽略新对象为null的字段
+     */
+    private boolean diffIgnoreNewObjectNullValue = false;
+
     public boolean isEnable() {
         return enable;
     }
@@ -61,5 +71,21 @@ public class EasyLogProperties {
 
     public void setAfterCommit(boolean afterCommit) {
         this.afterCommit = afterCommit;
+    }
+
+    public boolean isDiffIgnoreOldObjectNullValue() {
+        return diffIgnoreOldObjectNullValue;
+    }
+
+    public void setDiffIgnoreOldObjectNullValue(boolean diffIgnoreOldObjectNullValue) {
+        this.diffIgnoreOldObjectNullValue = diffIgnoreOldObjectNullValue;
+    }
+
+    public boolean isDiffIgnoreNewObjectNullValue() {
+        return diffIgnoreNewObjectNullValue;
+    }
+
+    public void setDiffIgnoreNewObjectNullValue(boolean diffIgnoreNewObjectNullValue) {
+        this.diffIgnoreNewObjectNullValue = diffIgnoreNewObjectNullValue;
     }
 }

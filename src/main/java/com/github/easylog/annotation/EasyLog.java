@@ -67,14 +67,9 @@ public @interface EasyLog {
 
 
     /**
-     * 变更前快照（用于字段差异对比）
+     * Diff变量或表达式（支持固定 key 或 SpEL 表达式）
      */
-    String before() default "";
-
-    /**
-     * 变更后快照（用于字段差异对比）
-     */
-    String after() default "";
+    String diffKey() default "";
 
     /**
      * 额外扩展信息（不参与字段差异对比）

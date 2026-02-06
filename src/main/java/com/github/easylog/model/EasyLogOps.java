@@ -30,9 +30,7 @@ public class EasyLogOps {
      */
     private String[] failParamList;
 
-    private String before;
-
-    private String after;
+    private String diffKey;
 
     private String extra;
 
@@ -110,20 +108,12 @@ public class EasyLogOps {
         this.failParamList = failParamList;
     }
 
-    public String getBefore() {
-        return before;
+    public String getDiffKey() {
+        return diffKey;
     }
 
-    public void setBefore(String before) {
-        this.before = before;
-    }
-
-    public String getAfter() {
-        return after;
-    }
-
-    public void setAfter(String after) {
-        this.after = after;
+    public void setDiffKey(String diffKey) {
+        this.diffKey = diffKey;
     }
 
     public String getExtra() {

@@ -1,6 +1,8 @@
 package com.github.easylog.aop;
 
 import com.github.easylog.annotation.EasyLog;
+import com.github.easylog.diff.DiffDTO;
+import com.github.easylog.diff.DiffFieldDTO;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.model.EasyLogOps;
 import com.github.easylog.model.MethodExecuteResult;
@@ -34,8 +36,7 @@ class EasyLogAspectHelperTest {
             successParamList = {"sp1"},
             fail = "fail",
             failParamList = {"fp1"},
-            before = "before",
-            after = "after",
+            diffKey = "diffKey",
             extra = "extra",
             condition = "cond"
     )
@@ -106,8 +107,7 @@ class EasyLogAspectHelperTest {
         assertEquals("biz", ops.getBizNo());
         assertEquals("success", ops.getSuccess());
         assertEquals("fail", ops.getFail());
-        assertEquals("before", ops.getBefore());
-        assertEquals("after", ops.getAfter());
+        assertEquals("diffKey", ops.getDiffKey());
         assertEquals("extra", ops.getExtra());
         assertEquals("cond", ops.getCondition());
 
@@ -115,8 +115,7 @@ class EasyLogAspectHelperTest {
         assertTrue(templates.contains("biz"));
         assertTrue(templates.contains("success"));
         assertTrue(templates.contains("fail"));
-        assertTrue(templates.contains("before"));
-        assertTrue(templates.contains("after"));
+        assertTrue(templates.contains("diffKey"));
         assertTrue(templates.contains("extra"));
         assertTrue(templates.contains("cond"));
         assertTrue(templates.contains("sp1"));
@@ -150,8 +149,7 @@ class EasyLogAspectHelperTest {
     void createEasyLogInfoBuildsSuccessLog() {
         EasyLogOps ops = new EasyLogOps();
         ops.setBizNo("bizKey");
-        ops.setBefore("beforeKey");
-        ops.setAfter("afterKey");
+        ops.setDiffKey("diffKey");
         ops.setExtra("extraKey");
         ops.setOperator("opKey");
         ops.setPlatform("platKey");
@@ -165,8 +163,13 @@ class EasyLogAspectHelperTest {
 
         Map<String, Object> templateMap = new HashMap<>();
         templateMap.put("bizKey", "BIZ-1");
-        templateMap.put("beforeKey", "{\"a\":1}");
-        templateMap.put("afterKey", "{\"a\":2}");
+        DiffDTO diffDTO = new DiffDTO();
+        DiffFieldDTO field = new DiffFieldDTO();
+        field.setFieldName("name");
+        field.setOldValue("old");
+        field.setNewValue("new");
+        diffDTO.setDiffFieldDTOList(Collections.singletonList(field));
+        templateMap.put("diffKey", diffDTO);
         templateMap.put("extraKey", "extra-info");
         templateMap.put("successKey", "success-msg");
         templateMap.put("param1", "P1");
@@ -176,7 +179,7 @@ class EasyLogAspectHelperTest {
         IOperatorService operatorService = new FixedOperatorService();
 
         List<EasyLogInfo> infos = EasyLogAspectHelper.createEasyLogInfo(
-                templateMap, Collections.singletonList(ops), executeResult, operatorService);
+                templateMap, Collections.singletonList(ops), executeResult, operatorService, Collections.emptyMap());
 
         assertEquals(1, infos.size());
         EasyLogInfo info = infos.get(0);
@@ -188,8 +191,8 @@ class EasyLogAspectHelperTest {
         assertEquals("fixed-plat", info.getPlatform());
         assertEquals("extra-info", info.getExtra());
         assertEquals("true", info.getCondition());
-        assertNotNull(info.getFieldInfoList());
-        assertFalse(info.getFieldInfoList().isEmpty());
+        assertNotNull(info.getDiffDTO());
+        assertFalse(info.getDiffDTO().getDiffFieldDTOList().isEmpty());
     }
 
     @Test
@@ -205,23 +208,27 @@ class EasyLogAspectHelperTest {
         templateMap.put("condKey", "false");
 
         List<EasyLogInfo> infos = EasyLogAspectHelper.createEasyLogInfo(
-                templateMap, Collections.singletonList(ops), new MethodExecuteResult(true), new FixedOperatorService());
+                templateMap, Collections.singletonList(ops), new MethodExecuteResult(true), new FixedOperatorService(), Collections.emptyMap());
         assertTrue(infos.isEmpty());
     }
 
     @Test
-    void createEasyLogInfoUsesFailTemplateAndDiffFromBeforeAfter() {
+    void createEasyLogInfoUsesFailTemplateAndDiffKey() {
         EasyLogOps ops = new EasyLogOps();
         ops.setBizNo("bizKey");
-        ops.setBefore("beforeKey");
-        ops.setAfter("afterKey");
+        ops.setDiffKey("diffKey");
         ops.setFail("failKey");
         ops.setFailParamList(new String[]{"failParam"});
 
         Map<String, Object> templateMap = new HashMap<>();
         templateMap.put("bizKey", "BIZ-1");
-        templateMap.put("beforeKey", "old");
-        templateMap.put("afterKey", "new");
+        DiffDTO diffDTO = new DiffDTO();
+        DiffFieldDTO field = new DiffFieldDTO();
+        field.setFieldName("field");
+        field.setOldValue("old");
+        field.setNewValue("new");
+        diffDTO.setDiffFieldDTOList(Collections.singletonList(field));
+        templateMap.put("diffKey", diffDTO);
         templateMap.put("failKey", "fail-msg");
         templateMap.put("failParam", "F1");
 
@@ -229,15 +236,15 @@ class EasyLogAspectHelperTest {
         executeResult.exception(new IllegalStateException("boom"));
 
         List<EasyLogInfo> infos = EasyLogAspectHelper.createEasyLogInfo(
-                templateMap, Collections.singletonList(ops), executeResult, new FixedOperatorService());
+                templateMap, Collections.singletonList(ops), executeResult, new FixedOperatorService(), Collections.emptyMap());
 
         assertEquals(1, infos.size());
         EasyLogInfo info = infos.get(0);
         assertEquals("fail-msg", info.getContent());
         assertEquals("F1", info.getContentParam()[0]);
-        assertNotNull(info.getFieldInfoList());
-        assertEquals("old", info.getFieldInfoList().get(0).getOldFieldVal());
-        assertEquals("new", info.getFieldInfoList().get(0).getNewFieldVal());
+        assertNotNull(info.getDiffDTO());
+        assertEquals("old", info.getDiffDTO().getDiffFieldDTOList().get(0).getOldValue());
+        assertEquals("new", info.getDiffDTO().getDiffFieldDTOList().get(0).getNewValue());
     }
 
     private static HttpServletRequest requestWithHeaders(Map<String, String> headers, String remoteAddr) {

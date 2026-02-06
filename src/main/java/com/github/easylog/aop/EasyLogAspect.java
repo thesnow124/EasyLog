@@ -37,9 +37,9 @@ import java.util.stream.Collectors;
  * <p>
  * 核心职责：
  * <ol>
- *     <li>在方法执行前解析注解与模板，预先计算需要前置执行的自定义函数（如“查询旧值”）。</li>
+ *     <li>在方法执行前解析注解与模板，收集需要渲染的模板片段。</li>
  *     <li>执行业务方法，捕获返回结果或异常，同时记录耗时与请求上下文。</li>
- *     <li>在方法执行后渲染模板（成功/失败、SpEL、自定义函数、占位符），构造 {@link EasyLogInfo} 并交给存储层。</li>
+ *     <li>在方法执行后渲染模板（成功/失败、SpEL、占位符），构造 {@link EasyLogInfo} 并交给存储层。</li>
  * </ol>
  * 任何解析/存储异常都被吞掉以避免影响业务主流程。
  * @author gaoshuanglong
@@ -77,16 +77,16 @@ public class EasyLogAspect {
         Object target = joinPoint.getTarget();
         Class<?> targetClass = AopUtils.getTargetClass(target);
 
-        // 方法前逻辑：解析注解、提取模板、执行前置函数
+        // 方法前逻辑：解析注解、提取模板
         List<String> expressTemplateList = new ArrayList<>();
-        Map<String, String> customFunctionExecResultMap = new HashMap<>();
+        Map<String, Object> beforeCache = new HashMap<>();
         List<EasyLogOps> easyLogOpsList = new ArrayList<>();
         try {
             EasyLog[] logList = method.getAnnotationsByType(EasyLog.class);
             easyLogOpsList = Arrays.stream(logList)
                     .map(EasyLogAspectHelper::parseLogAnnotation).collect(Collectors.toList());
             expressTemplateList = EasyLogAspectHelper.getExpressTemplate(easyLogOpsList);
-            customFunctionExecResultMap = easyLogParser.processBeforeExec(expressTemplateList, method, args, targetClass);
+            beforeCache = easyLogParser.processBeforeExec(expressTemplateList, method, args, targetClass);
         } catch (Exception e) {
             LOG.log(Level.INFO, "方法前逻辑发生异常", e);
         }
@@ -130,11 +130,11 @@ public class EasyLogAspect {
         // 方法后逻辑：渲染模板 -> 生成日志 -> 落地
         try {
             Map<String, Object> templateMap = easyLogParser.processAfterExec(
-                    expressTemplateList, customFunctionExecResultMap, method, args, targetClass,
+                    expressTemplateList, beforeCache, method, args, targetClass,
                     executeResult.getErrMsg(), executeResult.getResult(), localVars);
 
             List<EasyLogInfo> easyLogInfos = EasyLogAspectHelper.createEasyLogInfo(
-                    templateMap, easyLogOpsList, executeResult, operatorService);
+                    templateMap, easyLogOpsList, executeResult, operatorService, localVars);
             easyLogInfos.forEach(easyLogInfo -> {
                 easyLogInfo.setResult(JSON.toJSONString(executeResult.getResult()));
                 easyLogInfo.setSuccess(executeResult.isSuccess());
