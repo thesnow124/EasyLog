@@ -81,9 +81,30 @@ public class PlaceholderResolver {
         //值索引
         int valueIndex = 0;
         StringBuilder result = new StringBuilder(content);
-        while (start != -1 && valueIndex <= values.length - 1) {
-            int end = result.indexOf(this.placeholderSuffix);
-            String replaceContent = values[valueIndex++];
+        while (start != -1) {
+            int end = result.indexOf(this.placeholderSuffix, start + this.placeholderPrefix.length());
+            if (end == -1) {
+                break;
+            }
+            String placeholder = result.substring(start + this.placeholderPrefix.length(), end);
+            int replaceIndex = -1;
+            if (placeholder.trim().isEmpty()) {
+                if (valueIndex > values.length - 1) {
+                    start = result.indexOf(this.placeholderPrefix, end + this.placeholderSuffix.length());
+                    continue;
+                }
+                replaceIndex = valueIndex++;
+            } else if (isNumeric(placeholder)) {
+                int index = Integer.parseInt(placeholder);
+                if (index >= 0 && index <= values.length - 1) {
+                    replaceIndex = index;
+                }
+            }
+            if (replaceIndex == -1) {
+                start = result.indexOf(this.placeholderPrefix, end + this.placeholderSuffix.length());
+                continue;
+            }
+            String replaceContent = values[replaceIndex];
             result.replace(start, end + this.placeholderSuffix.length(), replaceContent);
             start = result.indexOf(this.placeholderPrefix, start + replaceContent.length());
         }
@@ -110,6 +131,18 @@ public class PlaceholderResolver {
         }
         for (int i = 0; i < value.length(); i++) {
             if (!Character.isWhitespace(value.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean isNumeric(String value) {
+        if (isBlank(value)) {
+            return false;
+        }
+        for (int i = 0; i < value.length(); i++) {
+            if (!Character.isDigit(value.charAt(i))) {
                 return false;
             }
         }
