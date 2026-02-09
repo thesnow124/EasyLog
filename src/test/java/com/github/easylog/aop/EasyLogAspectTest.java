@@ -1,8 +1,6 @@
 package com.github.easylog.aop;
 
 import com.github.easylog.annotation.EasyLog;
-import com.github.easylog.configuration.EasyLogProperties;
-import com.github.easylog.diff.DefaultDiffEngine;
 import com.github.easylog.function.EasyLogParser;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.service.ILogRecordService;
@@ -53,7 +51,7 @@ class EasyLogAspectTest {
     @Test
     void aroundSuccessRecordsLog() throws Throwable {
         RecordingLogRecordService recordService = new RecordingLogRecordService();
-        EasyLogParser parser = new EasyLogParser(new DefaultDiffEngine(new EasyLogProperties()));
+        EasyLogParser parser = new EasyLogParser();
         EasyLogAspect aspect = new EasyLogAspect(recordService, new FixedOperatorService(), parser, false);
 
         Target target = new Target();
@@ -77,7 +75,7 @@ class EasyLogAspectTest {
     @Test
     void aroundFailureRecordsAndRethrows() throws Exception {
         RecordingLogRecordService recordService = new RecordingLogRecordService();
-        EasyLogParser parser = new EasyLogParser(new DefaultDiffEngine(new EasyLogProperties()));
+        EasyLogParser parser = new EasyLogParser();
         EasyLogAspect aspect = new EasyLogAspect(recordService, new FixedOperatorService(), parser, false);
 
         FailingTarget target = new FailingTarget();

@@ -3,8 +3,11 @@ package com.github.easylog.configuration;
 
 import com.github.easylog.aop.EasyLogAspect;
 import com.github.easylog.diff.DefaultDiffEngine;
-import com.github.easylog.diff.DiffEngine;
+import com.github.easylog.function.DefaultFunctionServiceImpl;
 import com.github.easylog.function.EasyLogParser;
+import com.github.easylog.function.IFunctionService;
+import com.github.easylog.function.IParseFunction;
+import com.github.easylog.function.ParseFunctionFactory;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
 import com.github.easylog.support.DefaultLogRecordServiceImpl;
@@ -47,14 +50,26 @@ public class EasyLogAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnMissingBean(DiffEngine.class)
-    public DiffEngine diffEngine() {
+    @ConditionalOnMissingBean(DefaultDiffEngine.class)
+    public IParseFunction diffParseFunction() {
         return new DefaultDiffEngine(easyLogProperties);
     }
 
     @Bean
-    public EasyLogParser easyLogParser(DiffEngine diffEngine) {
-        return new EasyLogParser(diffEngine);
+    @ConditionalOnMissingBean(ParseFunctionFactory.class)
+    public ParseFunctionFactory parseFunctionFactory(java.util.List<IParseFunction> parseFunctions) {
+        return new ParseFunctionFactory(parseFunctions);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean(IFunctionService.class)
+    public IFunctionService functionService(ParseFunctionFactory parseFunctionFactory) {
+        return new DefaultFunctionServiceImpl(parseFunctionFactory);
+    }
+
+    @Bean
+    public EasyLogParser easyLogParser(IFunctionService functionService) {
+        return new EasyLogParser(functionService);
     }
 
     @Bean

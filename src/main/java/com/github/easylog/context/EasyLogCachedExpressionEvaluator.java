@@ -1,6 +1,6 @@
 package com.github.easylog.context;
 
-import com.github.easylog.diff.DiffEngine;
+import com.github.easylog.function.IFunctionService;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.context.expression.AnnotatedElementKey;
 import org.springframework.context.expression.BeanFactoryResolver;
@@ -21,10 +21,21 @@ import java.util.concurrent.ConcurrentHashMap;
 public class EasyLogCachedExpressionEvaluator extends CachedExpressionEvaluator {
 
     private final Map<ExpressionKey, Expression> keyCache = new ConcurrentHashMap<>(64);
-    private final DiffEngine diffEngine;
+    private static final IFunctionService NOOP_FUNCTION_SERVICE = new IFunctionService() {
+        @Override
+        public Object apply(String functionName, Object... values) {
+            return null;
+        }
 
-    public EasyLogCachedExpressionEvaluator(DiffEngine diffEngine) {
-        this.diffEngine = diffEngine;
+        @Override
+        public boolean beforeFunction(String functionName) {
+            return false;
+        }
+    };
+    private final IFunctionService functionService;
+
+    public EasyLogCachedExpressionEvaluator(IFunctionService functionService) {
+        this.functionService = functionService == null ? NOOP_FUNCTION_SERVICE : functionService;
     }
 
     public EvaluationContext createEvaluationContext(Method method, Object[] args, BeanFactory beanFactory, String errMsg, Object result) {
@@ -37,10 +48,11 @@ public class EasyLogCachedExpressionEvaluator extends CachedExpressionEvaluator 
                                                      String errMsg,
                                                      Object result,
                                                      Map<String, Object> localVars) {
-        EasyLogSpelRoot root = new EasyLogSpelRoot(diffEngine);
+        EasyLogSpelRoot root = new EasyLogSpelRoot();
         EasyLogEvaluationContext evaluationContext = new EasyLogEvaluationContext(
                 root, method, args, this.getParameterNameDiscoverer(), localVars);
         evaluationContext.putResult(errMsg, result);
+        evaluationContext.addMethodResolver(new EasyLogFunctionMethodResolver(functionService));
         if (beanFactory != null) {
             // setBeanResolver 主要用于支持SpEL模板中调用指定类的方法，如：@XXService.x(#root)
             evaluationContext.setBeanResolver(new BeanFactoryResolver(beanFactory));

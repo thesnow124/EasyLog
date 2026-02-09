@@ -5,7 +5,7 @@ EasyLog 是一个轻量级、基于注解的操作日志 SDK，面向 Spring Boo
 ## 特性
 - 注解驱动（`@EasyLog`，可通过 `@EasyLogs` 重复声明）。
 - SpEL 模板渲染（方法参数、返回值、异常信息、Spring Bean 调用）。
-- 自定义函数，支持“前置执行”（用于查询旧值）。
+- 自定义函数（通过 `{{FUNC(...)}}` 形式调用）。
 - 支持 diffKey 结构化差异对比（DiffDTO，字段级别名/忽略）。
 - 上下文变量 `EasyLogContext`（用于方法参数之外的数据）。
 - 可插拔的操作者/平台服务与日志存储服务。
@@ -63,6 +63,7 @@ EasyLog 支持两类表达式 + 顺序占位：
      - `#_result`：方法返回值
      - `#_errMsg`：异常信息
    - 支持调用 Spring Bean：`{{@labelService.label(#request.labelId)}}`
+   - 支持调用自定义函数：`{{DIFF(#oldObj,#newObj)}}`、`{{MASK(#phone)}}`
 
 2. **纯表达式**：`#arg`、`@bean.method(..)`、`T(Class).method(..)`
    - 当模板本身就是表达式时，直接求值。
@@ -148,6 +149,37 @@ public ILogRecordService logRecordService() {
     return log -> saveToDatabase(log);
 }
 ```
+
+### 自定义函数
+实现 `IParseFunction` 并注册为 Spring Bean 即可：
+
+```java
+@Bean
+public IParseFunction queryOldAddress(ScenarioStore store) {
+    return new IParseFunction() {
+        @Override
+        public String functionName() {
+            return "queryOldAddress";
+        }
+
+        @Override
+        public Object apply(Object... args) {
+            String bizNo = args == null || args.length == 0 ? null : String.valueOf(args[0]);
+            return store.get(bizNo);
+        }
+    };
+}
+```
+
+调用示例：
+
+```java
+@EasyLog(
+    success = "old address {{queryOldAddress(#request.orderNo)}}"
+)
+```
+
+当模板使用了未注册函数时，返回 `null` 并记录 `WARN` 日志，不影响业务主流程。
 
 ### 内置 DIFF
 

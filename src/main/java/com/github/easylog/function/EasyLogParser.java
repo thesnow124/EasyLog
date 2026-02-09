@@ -1,10 +1,8 @@
 package com.github.easylog.function;
 
-
 import com.alibaba.fastjson2.JSON;
 import com.github.easylog.constants.EasyLogConsts;
 import com.github.easylog.context.EasyLogCachedExpressionEvaluator;
-import com.github.easylog.diff.DiffEngine;
 import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
@@ -22,25 +20,29 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 核心模板解析器，支持 SpEL 块与纯表达式回退。
+ * 核心模板解析器，仅支持 SpEL 模板：
  * <ul>
- *     <li>SpEL 块：<code>{{ SpEL }}</code>，可引用参数、返回值、异常信息或 Spring Bean。</li>
+ *     <li>SpEL 块：<code>{{ expression }}</code>。</li>
+ *     <li>纯表达式：<code>#arg</code>、<code>@bean</code>、<code>T(xxx)</code>。</li>
  * </ul>
- * 解析流程：后置阶段先替换 SpEL，再回退解析纯表达式。
+ * 函数统一通过 SpEL 方法调用进入 {@link IParseFunction} 调度链。
+ *
  * @author gaoshuanglong
  */
 public class EasyLogParser implements BeanFactoryAware {
 
     private static final Logger LOG = Logger.getLogger(EasyLogParser.class.getName());
-
-    private BeanFactory beanFactory;
-
     private static final Pattern SPEL_BLOCK = Pattern.compile("\\{\\{\\s*(.*?)\\s*}}");
 
+    private BeanFactory beanFactory;
     private final EasyLogCachedExpressionEvaluator cachedExpressionEvaluator;
 
-    public EasyLogParser(DiffEngine diffEngine) {
-        this.cachedExpressionEvaluator = new EasyLogCachedExpressionEvaluator(diffEngine);
+    public EasyLogParser() {
+        this(null);
+    }
+
+    public EasyLogParser(IFunctionService functionService) {
+        this.cachedExpressionEvaluator = new EasyLogCachedExpressionEvaluator(functionService);
     }
 
     /**
@@ -74,14 +76,14 @@ public class EasyLogParser implements BeanFactoryAware {
         AnnotatedElementKey elementKey = new AnnotatedElementKey(method, targetClass);
         EvaluationContext ctx = cachedExpressionEvaluator.createEvaluationContext(method, args, beanFactory, errMsg, result, localVars);
         for (String template : expressTemplate) {
-            Object resolved = resolveTemplate(template, elementKey, ctx, beforeCache);
+            Object resolved = resolveTemplate(template, elementKey, ctx);
             map.put(template, resolved);
         }
         return map;
     }
 
     /**
-     * Before method execution: no-op (reserved for future extensions).
+     * Before method execution: reserved no-op.
      */
     public Map<String, Object> processBeforeExec(List<String> templates,
                                                  Method method,
@@ -92,8 +94,7 @@ public class EasyLogParser implements BeanFactoryAware {
 
     private Object resolveTemplate(String template,
                                    AnnotatedElementKey elementKey,
-                                   EvaluationContext ctx,
-                                   Map<String, Object> beforeCache) {
+                                   EvaluationContext ctx) {
         if (template == null) {
             return null;
         }
@@ -101,11 +102,9 @@ public class EasyLogParser implements BeanFactoryAware {
         if (isSingleSpelBlock(trimmed)) {
             Matcher matcher = SPEL_BLOCK.matcher(trimmed);
             if (matcher.matches()) {
-                String expr = matcher.group(1);
-                return safeEval(expr, elementKey, ctx);
+                return safeEval(matcher.group(1), elementKey, ctx);
             }
         }
-        // replace SpEL blocks {{ ... }}（处理纯 SpEL 占位）
         Matcher spelMatcher = SPEL_BLOCK.matcher(template);
         StringBuffer spelBuf = new StringBuffer();
         boolean spelMatched = false;
@@ -117,8 +116,6 @@ public class EasyLogParser implements BeanFactoryAware {
         }
         spelMatcher.appendTail(spelBuf);
         String replaced = spelBuf.toString();
-
-        // if no placeholder matched but it is a plain expression, evaluate whole
         if (!spelMatched && isPlainExpression(replaced)) {
             return safeEval(replaced, elementKey, ctx);
         }
@@ -166,7 +163,11 @@ public class EasyLogParser implements BeanFactoryAware {
         if (v instanceof CharSequence) {
             return v.toString();
         }
-        try { return JSON.toJSONString(v); } catch (Exception ignore) { return String.valueOf(v); }
+        try {
+            return JSON.toJSONString(v);
+        } catch (Exception ignore) {
+            return String.valueOf(v);
+        }
     }
 
     @Override

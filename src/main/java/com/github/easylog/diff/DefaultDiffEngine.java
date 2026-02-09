@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.github.easylog.annotation.EasyLogDiffField;
 import com.github.easylog.annotation.EasyLogDiffObject;
 import com.github.easylog.configuration.EasyLogProperties;
+import com.github.easylog.function.IParseFunction;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
@@ -16,7 +17,8 @@ import java.util.Map;
  * 默认Diff实现：按字段对比（含别名/忽略/空值策略）。
  * @author gaoshuanglong
  */
-public class DefaultDiffEngine implements DiffEngine {
+public class DefaultDiffEngine implements IParseFunction {
+
 
     private final boolean diffIgnoreOldObjectNullValue;
     private final boolean diffIgnoreNewObjectNullValue;
@@ -26,7 +28,6 @@ public class DefaultDiffEngine implements DiffEngine {
         this.diffIgnoreNewObjectNullValue = properties.isDiffIgnoreNewObjectNullValue();
     }
 
-    @Override
     public DiffDTO diff(Object oldObject, Object newObject) {
         if (oldObject == null || newObject == null) {
             return null;
@@ -103,6 +104,16 @@ public class DefaultDiffEngine implements DiffEngine {
             diffFieldDTOList.add(diffFieldDTO);
         }
         return diffDTO;
+    }
+
+    @Override
+    public String functionName() {
+        return "DIFF";
+    }
+
+    @Override
+    public Object apply(Object... values) {
+        return diff(values[0], values[1]);
     }
 
     private boolean judgeFieldDiffNeeded(Object objectValue,

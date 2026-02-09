@@ -15,6 +15,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EasyLogParserTest {
@@ -52,8 +53,22 @@ class EasyLogParserTest {
     }
 
     @Test
-    void renders_spel_blocks_and_plain_expression() throws Exception {
-        EasyLogParser parser = new EasyLogParser(new DefaultDiffEngine(new EasyLogProperties()));
+    void renders_spel_blocks_plain_expression_and_custom_function() throws Exception {
+        IParseFunction upper = new IParseFunction() {
+            @Override
+            public String functionName() {
+                return "UPPER";
+            }
+
+            @Override
+            public Object apply(Object... values) {
+                if (values == null || values.length == 0 || values[0] == null) {
+                    return null;
+                }
+                return String.valueOf(values[0]).toUpperCase();
+            }
+        };
+        EasyLogParser parser = new EasyLogParser(functionService(upper));
 
         DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
         beanFactory.registerSingleton("echoBean", new EchoBean());
@@ -65,7 +80,8 @@ class EasyLogParserTest {
                 "v1={{#name}}",
                 "{{#name}}-{{#code}}",
                 "#name",
-                "{{@echoBean.echo(#name)}}"
+                "{{@echoBean.echo(#name)}}",
+                "{{UPPER(#name)}}"
         );
 
         Map<String, Object> afterMap = parser.processAfterExec(
@@ -80,11 +96,12 @@ class EasyLogParserTest {
         assertEquals("alice-bob", afterMap.get("{{#name}}-{{#code}}"));
         assertEquals("alice", afterMap.get("#name"));
         assertEquals("bean:alice", afterMap.get("{{@echoBean.echo(#name)}}"));
+        assertEquals("ALICE", afterMap.get("{{UPPER(#name)}}"));
     }
 
     @Test
-    void returnsObjectWhenTemplateIsSingleSpelBlock() throws Exception {
-        EasyLogParser parser = new EasyLogParser(new DefaultDiffEngine(new EasyLogProperties()));
+    void returns_object_when_template_is_single_spel_block() throws Exception {
+        EasyLogParser parser = new EasyLogParser();
 
         Method method = ObjectTarget.class.getDeclaredMethod("work", Object.class);
         java.util.Map<String, Object> payload = new java.util.HashMap<>();
@@ -98,7 +115,8 @@ class EasyLogParserTest {
 
     @Test
     void resolves_diff_function_in_spel_block() throws Exception {
-        EasyLogParser parser = new EasyLogParser(new DefaultDiffEngine(new EasyLogProperties()));
+        IParseFunction diffFunction = new DefaultDiffEngine(new EasyLogProperties());
+        EasyLogParser parser = new EasyLogParser(functionService(diffFunction));
 
         Method method = DiffTarget.class.getDeclaredMethod("work", DiffUser.class, DiffUser.class);
         DiffUser oldObj = new DiffUser(1);
@@ -109,5 +127,23 @@ class EasyLogParserTest {
         Object resolved = map.get("{{DIFF(#p0,#p1)}}");
         assertNotNull(resolved);
         assertTrue(resolved instanceof DiffDTO);
+    }
+
+    @Test
+    void unknown_function_returns_null_in_single_spel_block() throws Exception {
+        EasyLogParser parser = new EasyLogParser(functionService());
+        Method method = Target.class.getDeclaredMethod("work", String.class, String.class);
+
+        Map<String, Object> map = parser.processAfterExec(
+                Arrays.asList("{{NOT_REGISTERED(#name)}}"),
+                java.util.Collections.<String, Object>emptyMap(),
+                method, new Object[]{"alice", "bob"}, Target.class, null, null);
+
+        assertTrue(map.containsKey("{{NOT_REGISTERED(#name)}}"));
+        assertNull(map.get("{{NOT_REGISTERED(#name)}}"));
+    }
+
+    private IFunctionService functionService(IParseFunction... functions) {
+        return new DefaultFunctionServiceImpl(new ParseFunctionFactory(Arrays.asList(functions)));
     }
 }

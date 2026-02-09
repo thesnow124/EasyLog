@@ -1,16 +1,19 @@
 package com.github.easylog.aop;
 
 import com.github.easylog.annotation.EasyLog;
-import com.github.easylog.annotation.EasyLogs;
 import com.github.easylog.annotation.EasyLogDiffField;
 import com.github.easylog.annotation.EasyLogDiffObject;
+import com.github.easylog.annotation.EasyLogs;
 import com.github.easylog.configuration.EasyLogProperties;
 import com.github.easylog.context.EasyLogContext;
 import com.github.easylog.diff.DefaultDiffEngine;
 import com.github.easylog.diff.DiffDTO;
-import com.github.easylog.diff.DiffEngine;
 import com.github.easylog.diff.DiffFieldDTO;
+import com.github.easylog.function.DefaultFunctionServiceImpl;
 import com.github.easylog.function.EasyLogParser;
+import com.github.easylog.function.IFunctionService;
+import com.github.easylog.function.IParseFunction;
+import com.github.easylog.function.ParseFunctionFactory;
 import com.github.easylog.model.EasyLogInfo;
 import com.github.easylog.service.ILogRecordService;
 import com.github.easylog.service.IOperatorService;
@@ -40,6 +43,7 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -232,6 +236,176 @@ class EasyLogAnnotationScenariosTest {
         }
     }
 
+    @Nested
+    @DisplayName("P0 Critical Combos")
+    class P0CriticalCombos {
+        @Test
+        void empty_fail_template_records_null_content() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P0-1");
+            IllegalStateException ex = assertThrows(IllegalStateException.class, () -> scenarioService.failWithEmptyTemplate(request));
+            assertEquals("boom-empty", ex.getMessage());
+
+            EasyLogInfo info = singleLog();
+            assertFalse(info.getSuccess());
+            assertNull(info.getContent());
+            assertEquals("boom-empty", info.getErrorMsg());
+        }
+
+        @Test
+        void placeholder_with_missing_params_keeps_unresolved_placeholder() {
+            ScenarioRequest request = ScenarioRequest.base().withOperator("amy").withBizNo("B-P0-2");
+            scenarioService.placeholderMissingParam(request);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("a amy b ${}", info.getContent());
+        }
+
+        @Test
+        void placeholder_with_extra_params_ignores_extra_values() {
+            ScenarioRequest request = ScenarioRequest.base().withOperator("amy").withBizNo("B-P0-3");
+            scenarioService.placeholderExtraParam(request);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("a amy", info.getContent());
+        }
+
+        @Test
+        void non_boolean_condition_string_skips_recording() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P0-4");
+            scenarioService.conditionalStringYes(request);
+            assertTrue(logRecordService.snapshot().isEmpty());
+        }
+
+        @Test
+        void null_condition_skips_recording() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P0-5");
+            scenarioService.conditionalNull(request);
+            assertTrue(logRecordService.snapshot().isEmpty());
+        }
+
+        @Test
+        void diff_key_expression_can_fallback_to_context_key() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P0-6");
+            scenarioService.diffKeyExpressionReturnsString(request);
+
+            EasyLogInfo info = singleLog();
+            assertNotNull(info.getDiffDTO());
+            assertEquals(1, info.getDiffDTO().getDiffFieldDTOList().size());
+            DiffFieldDTO field = info.getDiffDTO().getDiffFieldDTOList().get(0);
+            assertEquals("status", field.getFieldName());
+            assertEquals("old", field.getOldValue());
+            assertEquals("new", field.getNewValue());
+        }
+
+        @Test
+        void missing_diff_key_returns_null_diff_dto() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P0-7");
+            scenarioService.diffKeyMissing(request);
+
+            EasyLogInfo info = singleLog();
+            assertNull(info.getDiffDTO());
+        }
+    }
+
+    @Nested
+    @DisplayName("P1 Important Combos")
+    class P1ImportantCombos {
+        @Test
+        void operator_fallback_only() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P1-1").withPlatform("mobile");
+            scenarioService.operatorFallbackOnly(request);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("default-op", info.getOperator());
+            assertEquals("mobile", info.getPlatform());
+        }
+
+        @Test
+        void platform_fallback_only() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P1-2").withOperator("tom");
+            scenarioService.platformFallbackOnly(request);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("tom", info.getOperator());
+            assertEquals("default-plat", info.getPlatform());
+        }
+
+        @Test
+        void extra_is_resolved_from_expression() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P1-3").withAddress("addr-x");
+            scenarioService.extraResolved(request);
+
+            EasyLogInfo info = singleLog();
+            assertEquals("addr-x", info.getExtra());
+        }
+
+        @Test
+        void empty_extra_keeps_null() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P1-4");
+            scenarioService.extraEmpty(request);
+
+            EasyLogInfo info = singleLog();
+            assertNull(info.getExtra());
+        }
+
+        @Test
+        void repeatable_annotations_with_mixed_conditions_record_partial_logs() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P1-5");
+            scenarioService.multiWithCondition(request);
+
+            List<EasyLogInfo> logs = logRecordService.snapshot();
+            assertEquals(1, logs.size());
+            assertEquals("user-cond", logs.get(0).getModule());
+            assertEquals("cond-true", logs.get(0).getContent());
+        }
+
+        @Test
+        void repeatable_annotations_use_fail_templates_on_exception() {
+            ScenarioRequest request = ScenarioRequest.base().withBizNo("B-P1-6");
+            IllegalStateException ex = assertThrows(IllegalStateException.class, () -> scenarioService.multiFail(request));
+            assertEquals("boom-multi", ex.getMessage());
+
+            List<EasyLogInfo> logs = logRecordService.snapshot();
+            assertEquals(2, logs.size());
+            Set<String> contents = logs.stream().map(EasyLogInfo::getContent).collect(Collectors.toSet());
+            assertTrue(contents.contains("fail-one boom-multi"));
+            assertTrue(contents.contains("fail-two boom-multi"));
+            assertTrue(logs.stream().allMatch(log -> !log.getSuccess()));
+        }
+    }
+
+    @Nested
+    @DisplayName("P2 Edge Combos")
+    class P2EdgeCombos {
+        @Test
+        void biz_no_can_be_null() {
+            scenarioService.bizNoNull(ScenarioRequest.base().withBizNo("B-P2-1"));
+            EasyLogInfo info = singleLog();
+            assertNull(info.getBizNo());
+        }
+
+        @Test
+        void empty_success_template_with_params_records_null_content() {
+            scenarioService.successEmptyWithParams(ScenarioRequest.base().withBizNo("B-P2-2"));
+            EasyLogInfo info = singleLog();
+            assertNull(info.getContent());
+        }
+
+        @Test
+        void success_template_can_reference_errmsg_as_empty() {
+            scenarioService.successUsesErrMsg(ScenarioRequest.base().withBizNo("B-P2-3"));
+            EasyLogInfo info = singleLog();
+            assertEquals("err ", info.getContent());
+        }
+
+        @Test
+        void unknown_function_in_single_block_returns_null_content() {
+            scenarioService.unknownFunctionInTemplate(ScenarioRequest.base().withBizNo("B-P2-4"));
+            EasyLogInfo info = singleLog();
+            assertNull(info.getContent());
+        }
+    }
+
     private EasyLogInfo singleLog() {
         List<EasyLogInfo> logs = logRecordService.snapshot();
         assertEquals(1, logs.size());
@@ -272,13 +446,23 @@ class EasyLogAnnotationScenariosTest {
         }
 
         @Bean
-        DiffEngine diffEngine(EasyLogProperties properties) {
+        IParseFunction diffFunction(EasyLogProperties properties) {
             return new DefaultDiffEngine(properties);
         }
 
         @Bean
-        EasyLogParser easyLogParser(DiffEngine diffEngine) {
-            return new EasyLogParser(diffEngine);
+        ParseFunctionFactory parseFunctionFactory(List<IParseFunction> parseFunctions) {
+            return new ParseFunctionFactory(parseFunctions);
+        }
+
+        @Bean
+        IFunctionService functionService(ParseFunctionFactory parseFunctionFactory) {
+            return new DefaultFunctionServiceImpl(parseFunctionFactory);
+        }
+
+        @Bean
+        EasyLogParser easyLogParser(IFunctionService functionService) {
+            return new EasyLogParser(functionService);
         }
 
         @Bean
@@ -420,6 +604,202 @@ class EasyLogAnnotationScenariosTest {
                 )
         })
         public void multi(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "p0",
+                type = "DELETE",
+                bizNo = "{{#request.bizNo}}",
+                success = "ok",
+                fail = ""
+        )
+        public void failWithEmptyTemplate(ScenarioRequest request) {
+            throw new IllegalStateException("boom-empty");
+        }
+
+        @EasyLog(
+                module = "p0",
+                type = "CREATE",
+                bizNo = "#request.bizNo",
+                success = "a ${} b ${}",
+                successParamList = {"{{#request.operator}}"}
+        )
+        public void placeholderMissingParam(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "p0",
+                type = "CREATE",
+                bizNo = "#request.bizNo",
+                success = "a ${}",
+                successParamList = {"{{#request.operator}}", "{{#request.bizNo}}"}
+        )
+        public void placeholderExtraParam(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "p0",
+                type = "UPDATE",
+                bizNo = "#request.bizNo",
+                success = "ok",
+                condition = "{{'yes'}}"
+        )
+        public void conditionalStringYes(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "p0",
+                type = "UPDATE",
+                bizNo = "#request.bizNo",
+                success = "ok",
+                condition = "{{null}}"
+        )
+        public void conditionalNull(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "p0",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                diffKey = "{{'manualDiff'}}",
+                success = "diff-fallback"
+        )
+        public void diffKeyExpressionReturnsString(ScenarioRequest request) {
+            DiffDTO diffDTO = new DiffDTO();
+            DiffFieldDTO field = new DiffFieldDTO();
+            field.setFieldName("status");
+            field.setOldValue("old");
+            field.setNewValue("new");
+            diffDTO.setDiffFieldDTOList(java.util.Collections.singletonList(field));
+            EasyLogContext.put("manualDiff", diffDTO);
+        }
+
+        @EasyLog(
+                module = "p0",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                diffKey = "missingDiff",
+                success = "diff-missing"
+        )
+        public void diffKeyMissing(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                platform = "{{#request.platform}}",
+                operator = "",
+                module = "p1",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                success = "operator-fallback"
+        )
+        public void operatorFallbackOnly(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                platform = "",
+                operator = "{{#request.operator}}",
+                module = "p1",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                success = "platform-fallback"
+        )
+        public void platformFallbackOnly(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "p1",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                extra = "{{#request.address}}",
+                success = "extra-resolved"
+        )
+        public void extraResolved(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "p1",
+                type = "UPDATE",
+                bizNo = "{{#request.bizNo}}",
+                extra = "",
+                success = "extra-empty"
+        )
+        public void extraEmpty(ScenarioRequest request) {
+        }
+
+        @EasyLogs({
+                @EasyLog(
+                        module = "user-cond",
+                        type = "TRACE",
+                        bizNo = "{{#request.bizNo}}",
+                        success = "cond-true",
+                        condition = "{{true}}"
+                ),
+                @EasyLog(
+                        module = "audit-cond",
+                        type = "TRACE",
+                        bizNo = "{{#request.bizNo}}",
+                        success = "cond-false",
+                        condition = "{{false}}"
+                )
+        })
+        public void multiWithCondition(ScenarioRequest request) {
+        }
+
+        @EasyLogs({
+                @EasyLog(
+                        module = "mfail1",
+                        type = "TRACE",
+                        bizNo = "{{#request.bizNo}}",
+                        success = "ok1",
+                        fail = "fail-one {{#_errMsg}}"
+                ),
+                @EasyLog(
+                        module = "mfail2",
+                        type = "TRACE",
+                        bizNo = "{{#request.bizNo}}",
+                        success = "ok2",
+                        fail = "fail-two {{#_errMsg}}"
+                )
+        })
+        public void multiFail(ScenarioRequest request) {
+            throw new IllegalStateException("boom-multi");
+        }
+
+        @EasyLog(
+                module = "p2",
+                type = "READ",
+                bizNo = "{{null}}",
+                success = "biz-null"
+        )
+        public void bizNoNull(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "p2",
+                type = "READ",
+                bizNo = "{{#request.bizNo}}",
+                success = "",
+                successParamList = {"{{#request.operator}}"}
+        )
+        public void successEmptyWithParams(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "p2",
+                type = "READ",
+                bizNo = "{{#request.bizNo}}",
+                success = "err {{#_errMsg}}"
+        )
+        public void successUsesErrMsg(ScenarioRequest request) {
+        }
+
+        @EasyLog(
+                module = "p2",
+                type = "READ",
+                bizNo = "{{#request.bizNo}}",
+                success = "{{NOT_REGISTERED(#request.bizNo)}}"
+        )
+        public void unknownFunctionInTemplate(ScenarioRequest request) {
         }
     }
 

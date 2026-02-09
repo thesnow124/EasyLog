@@ -4,6 +4,7 @@ import java.util.List;
 
 /**
  * Diff结果实体
+ * @author gaoshuanglong
  */
 public class DiffDTO {
 
