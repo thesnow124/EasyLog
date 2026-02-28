@@ -1,15 +1,10 @@
 package com.github.easylog.util;
 
-import java.util.Map;
-import java.util.Objects;
-import java.util.Properties;
-import java.util.function.Function;
+import org.springframework.util.PropertyPlaceholderHelper;
+
 import java.util.stream.Stream;
 
 /**
- * 轻量占位符解析工具，默认解析形如 {@code ${}} 的顺序占位符。
- * 与 Spring 的 PropertyPlaceholder 类似，但更简单：不支持嵌套/默认值，仅按顺序或 Map/规则替换。
- * 在 EasyLog 中用于将模板中的 `${}` 替换为渲染后的 SpEL 结果。
  * @author Gaosl
  */
 public class PlaceholderResolver {
@@ -26,25 +21,29 @@ public class PlaceholderResolver {
     /**
      * 默认单例解析器
      */
-    private static PlaceholderResolver defaultResolver = new PlaceholderResolver();
+    private static final PlaceholderResolver DEFAULT_RESOLVER = new PlaceholderResolver();
 
     /**
      * 占位符前缀
      */
-    private String placeholderPrefix = DEFAULT_PLACEHOLDER_PREFIX;
+    private final String placeholderPrefix;
 
     /**
      * 占位符后缀
      */
-    private String placeholderSuffix = DEFAULT_PLACEHOLDER_SUFFIX;
+    private final String placeholderSuffix;
+
+    private final PropertyPlaceholderHelper placeholderHelper;
 
 
     private PlaceholderResolver() {
+        this(DEFAULT_PLACEHOLDER_PREFIX, DEFAULT_PLACEHOLDER_SUFFIX);
     }
 
     private PlaceholderResolver(String placeholderPrefix, String placeholderSuffix) {
         this.placeholderPrefix = placeholderPrefix;
         this.placeholderSuffix = placeholderSuffix;
+        this.placeholderHelper = new PropertyPlaceholderHelper(placeholderPrefix, placeholderSuffix, null, true);
     }
 
     /**
@@ -53,7 +52,7 @@ public class PlaceholderResolver {
      * @return
      */
     public static PlaceholderResolver getDefaultResolver() {
-        return defaultResolver;
+        return DEFAULT_RESOLVER;
     }
 
     public static PlaceholderResolver getResolver(String placeholderPrefix, String placeholderSuffix) {
@@ -71,44 +70,20 @@ public class PlaceholderResolver {
      * @return
      */
     public String resolve(String content, String[] values) {
-        if (isBlank(content) || Objects.isNull(values)) {
+        if (isBlank(content) || values == null) {
             return content;
         }
-        int start = content.indexOf(this.placeholderPrefix);
-        if (start == -1) {
+        if (!containsPlaceholder(content)) {
             return content;
         }
-        //值索引
-        int valueIndex = 0;
-        StringBuilder result = new StringBuilder(content);
-        while (start != -1) {
-            int end = result.indexOf(this.placeholderSuffix, start + this.placeholderPrefix.length());
-            if (end == -1) {
-                break;
+        int[] valueIndex = {0};
+        return placeholderHelper.replacePlaceholders(content, placeholder -> {
+            int replaceIndex = resolveReplaceIndex(placeholder, valueIndex, values.length);
+            if (replaceIndex < 0) {
+                return null;
             }
-            String placeholder = result.substring(start + this.placeholderPrefix.length(), end);
-            int replaceIndex = -1;
-            if (placeholder.trim().isEmpty()) {
-                if (valueIndex > values.length - 1) {
-                    start = result.indexOf(this.placeholderPrefix, end + this.placeholderSuffix.length());
-                    continue;
-                }
-                replaceIndex = valueIndex++;
-            } else if (isNumeric(placeholder)) {
-                int index = Integer.parseInt(placeholder);
-                if (index >= 0 && index <= values.length - 1) {
-                    replaceIndex = index;
-                }
-            }
-            if (replaceIndex == -1) {
-                start = result.indexOf(this.placeholderPrefix, end + this.placeholderSuffix.length());
-                continue;
-            }
-            String replaceContent = values[replaceIndex];
-            result.replace(start, end + this.placeholderSuffix.length(), replaceContent);
-            start = result.indexOf(this.placeholderPrefix, start + replaceContent.length());
-        }
-        return result.toString();
+            return values[replaceIndex];
+        });
     }
 
     /**
@@ -149,55 +124,32 @@ public class PlaceholderResolver {
         return true;
     }
 
-    /**
-     * 根据替换规则来替换指定模板中的占位符值
-     *
-     * @param content 要解析的字符串
-     * @param rule    解析规则回调
-     * @return
-     */
-    public String resolveByRule(String content, Function<String, String> rule) {
-        int start = content.indexOf(this.placeholderPrefix);
-        if (start == -1) {
-            return content;
+
+
+
+    private boolean containsPlaceholder(String content) {
+        return content.contains(this.placeholderPrefix);
+    }
+
+    private static int resolveReplaceIndex(String placeholder, int[] valueIndex, int valueCount) {
+        if (placeholder == null) {
+            return -1;
         }
-        StringBuilder result = new StringBuilder(content);
-        while (start != -1) {
-            int end = result.indexOf(this.placeholderSuffix, start);
-            //获取占位符属性值，如${id}, 即获取id
-            String placeholder = result.substring(start + this.placeholderPrefix.length(), end);
-            //替换整个占位符内容，即将${id}值替换为替换规则回调中的内容
-            String replaceContent = placeholder.trim().isEmpty() ? "" : rule.apply(placeholder);
-            result.replace(start, end + this.placeholderSuffix.length(), replaceContent);
-            start = result.indexOf(this.placeholderPrefix, start + replaceContent.length());
+        if (placeholder.trim().isEmpty()) {
+            int current = valueIndex[0];
+            if (current >= valueCount) {
+                return -1;
+            }
+            valueIndex[0] = current + 1;
+            return current;
         }
-        return result.toString();
+        if (isNumeric(placeholder)) {
+            int index = Integer.parseInt(placeholder);
+            if (index >= 0 && index < valueCount) {
+                return index;
+            }
+        }
+        return -1;
     }
-
-    /**
-     * 替换模板中占位符内容，占位符的内容即为map key对应的值，key为占位符中的内容。<br/><br/>
-     * 如：content = product:${id}:extra:${eid}<br/>
-     * valueMap = id -> 1; pid -> 2<br/>
-     * 经过解析返回 product:1:extra:2<br/>
-     *
-     * @param content  模板内容。
-     * @param valueMap 值映射
-     * @return 替换完成后的字符串。
-     */
-    public String resolveByMap(String content, final Map<String, Object> valueMap) {
-        return resolveByRule(content, placeholderValue -> String.valueOf(valueMap.get(placeholderValue)));
-    }
-
-    /**
-     * 根据properties文件替换占位符内容
-     *
-     * @param content
-     * @param properties
-     * @return
-     */
-    public String resolveByProperties(String content, final Properties properties) {
-        return resolveByRule(content, properties::getProperty);
-    }
-
 
 }

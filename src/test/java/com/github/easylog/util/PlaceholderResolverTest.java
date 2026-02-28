@@ -44,30 +44,4 @@ class PlaceholderResolverTest {
         String resolved = resolver.resolve("a=${2},b=${}", "x");
         assertEquals("a=${2},b=x", resolved);
     }
-
-    @Test
-    void resolveByRuleHandlesEmptyPlaceholders() {
-        PlaceholderResolver resolver = PlaceholderResolver.getDefaultResolver();
-        String resolved = resolver.resolveByRule("a=${id},b=${}", key -> "[" + key + "]");
-        assertEquals("a=[id],b=", resolved);
-    }
-
-    @Test
-    void resolveByMapUsesValues() {
-        PlaceholderResolver resolver = PlaceholderResolver.getDefaultResolver();
-        Map<String, Object> map = new HashMap<>();
-        map.put("id", 9);
-        map.put("name", "alice");
-        String resolved = resolver.resolveByMap("id=${id},name=${name},missing=${missing}", map);
-        assertEquals("id=9,name=alice,missing=null", resolved);
-    }
-
-    @Test
-    void resolveByPropertiesUsesProperties() {
-        PlaceholderResolver resolver = PlaceholderResolver.getDefaultResolver();
-        Properties props = new Properties();
-        props.setProperty("k1", "v1");
-        String resolved = resolver.resolveByProperties("k1=${k1}", props);
-        assertEquals("k1=v1", resolved);
-    }
 }
