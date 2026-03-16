@@ -18,7 +18,7 @@ Maven：
 <dependency>
   <groupId>com.github</groupId>
   <artifactId>easy-log</artifactId>
-  <version>1.0.0-20260204-SNAPSHOT</version>
+  <version>1.0.3</version>
 </dependency>
 ```
 
